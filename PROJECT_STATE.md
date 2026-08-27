@@ -8,6 +8,7 @@
 ## 📌 1. Informasi Umum & Repositori
 
 - **Nama Projek**: VeloDrop (High-Velocity Media Ingest & Downloader)
+- **Versi Aktif**: `v1.1.0` (Native Offline-First Android APK + FFmpeg Cloud Engine)
 - **Tujuan Utama**: Aplikasi web & mobile untuk mengunduh video dan audio kualitas tinggi dari YouTube, TikTok (Tanpa Watermark), dan Instagram, dilengkapi pemutar in-app dan background audio.
 - **GitHub Repository**: [https://github.com/Ricardo169zzz/velodrop](https://github.com/Ricardo169zzz/velodrop)
 - **Live Production URL (Railway)**: [https://velodrop-production.up.railway.app](https://velodrop-production.up.railway.app)

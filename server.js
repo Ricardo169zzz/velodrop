@@ -11,6 +11,11 @@ const https = require('https');
 const http = require('http');
 const { spawn } = require('child_process');
 
+let ffmpegPath = null;
+try {
+  ffmpegPath = require('ffmpeg-static');
+} catch (e) {}
+
 const app = express();
 const PORT = process.env.PORT || 3344;
 
@@ -561,47 +566,49 @@ app.post('/api/video/download', async (req, res) => {
   const targetFilename = `${cleanTitle}-${fileId}.${ext}`;
   const targetFilePath = path.join(DOWNLOADS_DIR, targetFilename);
 
-  // Check if we have direct TikTok stream URL
+  // Check if we have direct TikTok or Instagram stream URL
   const isTikTok = /tiktok\.com/i.test(url);
-  if (isTikTok && (directVideoUrl || directAudioUrl)) {
+  const isInstagram = /instagram\.com/i.test(url);
+
+  if ((directVideoUrl || directAudioUrl) && (isTikTok || isInstagram)) {
     const streamTarget = isAudio ? (directAudioUrl || directVideoUrl) : directVideoUrl;
     
-    downloadDirectStream(streamTarget, targetFilePath, (err) => {
-      if (err) {
-        console.error('TikTok Direct stream error:', err);
-        return;
-      }
+    downloadDirectStream(streamTarget, targetFilePath)
+      .then(() => {
+        if (fs.existsSync(targetFilePath)) {
+          const stats = fs.statSync(targetFilePath);
+          const actualSizeMb = (stats.size / (1024 * 1024)).toFixed(1);
 
-      if (fs.existsSync(targetFilePath)) {
-        const stats = fs.statSync(targetFilePath);
-        const actualSizeMb = (stats.size / (1024 * 1024)).toFixed(1);
+          const nowTime = Date.now();
+          const historyItem = {
+            id: fileId,
+            timestamp: nowTime,
+            createdAt: new Date().toISOString(),
+            type: isAudio ? 'audio' : 'video',
+            filename: title || targetFilename,
+            savedFile: targetFilename,
+            source: uploader || (isTikTok ? 'TikTok' : 'Instagram'),
+            sizeMb: parseFloat(actualSizeMb) || 2.4,
+            duration: duration || '00:30',
+            badge: isAudio ? 'MP3 Audio' : (isTikTok ? 'TikTok HD' : 'Reels HD'),
+            thumb: thumbnail || '',
+            filePath: `/media/${encodeURIComponent(targetFilename)}`
+          };
 
-        const nowTime = Date.now();
-        const historyItem = {
-          id: fileId,
-          timestamp: nowTime,
-          createdAt: new Date().toISOString(),
-          type: isAudio ? 'audio' : 'video',
-          filename: title || targetFilename,
-          savedFile: targetFilename,
-          source: uploader || 'TikTok Creator',
-          sizeMb: parseFloat(actualSizeMb),
-          duration: duration || '00:30',
-          badge: isAudio ? 'MP3 Audio' : 'TikTok HD',
-          thumb: thumbnail || '',
-          filePath: `/media/${encodeURIComponent(targetFilename)}`
-        };
-
-        const history = readHistory();
-        const filtered = history.filter(h => h.id !== fileId);
-        filtered.unshift(historyItem);
-        writeHistory(filtered);
-      }
-    });
+          const history = readHistory();
+          const filtered = history.filter(h => h.id !== fileId);
+          filtered.unshift(historyItem);
+          writeHistory(filtered);
+          console.log(`[VeloDrop] Direct download completed and saved: ${targetFilename}`);
+        }
+      })
+      .catch((err) => {
+        console.error('Direct stream error:', err);
+      });
 
     return res.json({
       success: true,
-      message: 'Pengunduhan TikTok dimulai.',
+      message: 'Pengunduhan media dimulai.',
       fileId: fileId
     });
   }
@@ -612,7 +619,7 @@ app.post('/api/video/download', async (req, res) => {
   }
 
   const outputTemplate = path.join(DOWNLOADS_DIR, `%(title).60s-${fileId}.%(ext)s`);
-  const formatArg = isAudio ? 'ba[ext=m4a]/ba/bestaudio' : 'b[ext=mp4]/b/best';
+  const formatArg = isAudio ? 'bestaudio/best' : 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
   const args = [
     '--js-runtimes', 'node',
     '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
@@ -620,9 +627,16 @@ app.post('/api/video/download', async (req, res) => {
     '--no-part',
     '--no-warnings',
     '--no-check-certificate',
-    '-o', outputTemplate,
-    url
+    '-o', outputTemplate
   ];
+
+  if (ffmpegPath && fs.existsSync(ffmpegPath)) {
+    args.push('--ffmpeg-location', ffmpegPath);
+  }
+  if (isAudio) {
+    args.push('--extract-audio', '--audio-format', 'mp3');
+  }
+  args.push(url);
 
   const proc = spawn(YTDLP_PATH, args, { windowsHide: true });
   let savedFilePath = '';
@@ -659,7 +673,7 @@ app.post('/api/video/download', async (req, res) => {
         filename: title || finalBasename,
         savedFile: finalBasename,
         source: uploader || 'VeloDrop Engine',
-        sizeMb: parseFloat(actualSizeMb),
+        sizeMb: parseFloat(actualSizeMb) || 12.0,
         duration: duration || '03:00',
         badge: isAudio ? 'MP3 Audio' : 'MP4 HD',
         thumb: thumbnail || '',
@@ -670,6 +684,7 @@ app.post('/api/video/download', async (req, res) => {
       const filtered = history.filter(h => h.id !== fileId);
       filtered.unshift(historyItem);
       writeHistory(filtered);
+      console.log(`[VeloDrop] YT-DLP download completed and saved: ${finalBasename}`);
     }
   });
 

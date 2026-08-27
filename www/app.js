@@ -675,6 +675,12 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${day} ${month} ${year}`;
   }
 
+  function getMediaUrl(filePath) {
+    if (!filePath) return '';
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) return filePath;
+    return `${API_BASE}${filePath.startsWith('/') ? '' : '/'}${filePath}`;
+  }
+
   function renderDownloadsList() {
     if (!downloadList) return;
     updateCategoryCounters();
@@ -745,6 +751,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
 
+      const resolvedMediaUrl = getMediaUrl(item.filePath);
       const actionsHtml = !isDeleteMode ? `
         <div class="media-card-actions" style="display: flex; align-items: center; gap: 6px;">
           <button class="btn-play-action btn-play-inapp" title="Tonton / Dengar di Aplikasi">
@@ -752,7 +759,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <polygon points="5 3 19 12 5 21 5 3"></polygon>
             </svg>
           </button>
-          <a href="${item.filePath}" download="${item.savedFile}" class="btn-play-action btn-save-storage" title="Simpan ke Folder HP / Komputer">
+          <a href="${resolvedMediaUrl}" download="${item.savedFile}" class="btn-play-action btn-save-storage" title="Simpan ke Folder HP / Komputer">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="14" height="14">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
@@ -904,11 +911,12 @@ document.addEventListener('DOMContentLoaded', () => {
       updateAudioDockPlayState(false);
     }
 
+    const mediaUrl = getMediaUrl(item.filePath);
     if (videoModalTitle) videoModalTitle.textContent = item.filename;
-    inappVideoElement.src = item.filePath;
+    inappVideoElement.src = mediaUrl;
     
     if (btnSaveVideoDevice) {
-      btnSaveVideoDevice.href = item.filePath;
+      btnSaveVideoDevice.href = mediaUrl;
       btnSaveVideoDevice.download = item.savedFile || `${item.filename}.mp4`;
     }
 
@@ -967,7 +975,8 @@ document.addEventListener('DOMContentLoaded', () => {
     currentPlayingAudio = item;
     if (audioDockTitle) audioDockTitle.textContent = item.filename;
     
-    inappAudioElement.src = item.filePath;
+    const mediaUrl = getMediaUrl(item.filePath);
+    inappAudioElement.src = mediaUrl;
     inappAudioElement.play().then(() => {
       updateAudioDockPlayState(true);
     }).catch(e => console.log('Audio autoplay prevented:', e));
@@ -1088,7 +1097,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ============================================================
   // 11. CHANGELOG MODAL & SYSTEM UPDATE CHECKER
   // ============================================================
-  const CURRENT_APP_VERSION = 'v1.0.0';
+  const CURRENT_APP_VERSION = 'v1.1.0';
   const btnOpenChangelog = document.getElementById('btn-open-changelog');
   const btnCloseChangelog = document.getElementById('btn-close-changelog');
   const btnCloseChangelogFoot = document.getElementById('btn-close-changelog-foot');
