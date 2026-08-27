@@ -828,7 +828,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
 
-      const resolvedMediaUrl = getMediaUrl(item.filePath);
+      const resolvedMediaUrl = getMediaUrl(item);
       const actionsHtml = !isDeleteMode ? `
         <div class="media-card-actions" style="display: flex; align-items: center; gap: 6px;">
           <button class="btn-play-action btn-play-inapp" title="Tonton / Dengar di Aplikasi">
@@ -836,7 +836,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <polygon points="5 3 19 12 5 21 5 3"></polygon>
             </svg>
           </button>
-          <a href="${resolvedMediaUrl}" download="${item.savedFile}" class="btn-play-action btn-save-storage" title="Simpan ke Folder HP / Komputer">
+          <a href="${resolvedMediaUrl}" download="${item.savedFile}" target="_blank" class="btn-play-action btn-save-storage" title="Simpan ke Folder HP / Komputer">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="14" height="14">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
@@ -875,6 +875,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const thumbEl = card.querySelector('.media-thumb-box');
         const infoEl = card.querySelector('.media-content-info');
         const playInappBtn = card.querySelector('.btn-play-inapp');
+        const saveStorageBtn = card.querySelector('.btn-save-storage');
 
         const triggerPlay = () => {
           if (item.type === 'video') {
@@ -887,6 +888,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (thumbEl) thumbEl.addEventListener('click', triggerPlay);
         if (infoEl) infoEl.addEventListener('click', triggerPlay);
         if (playInappBtn) playInappBtn.addEventListener('click', triggerPlay);
+
+        if (saveStorageBtn) {
+          saveStorageBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const dlUrl = getMediaUrl(item);
+            if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+              window.open(dlUrl, '_system');
+            }
+          });
+        }
       }
 
       downloadList.appendChild(card);

@@ -79,18 +79,55 @@ app.use(express.static(path.join(__dirname)));
 // Dedicated High-Performance Range 206 Streaming for Audio & Video
 app.get('/media/:filename', (req, res) => {
   const rawFilename = decodeURIComponent(req.params.filename);
-  const filePath = path.join(DOWNLOADS_DIR, rawFilename);
+  let filePath = path.join(DOWNLOADS_DIR, rawFilename);
+
+  // 1. Direct file check
+  if (!fs.existsSync(filePath)) {
+    // 2. Timestamp ID match (e.g. name-1787844863217.mp3)
+    const idMatch = rawFilename.match(/(\d{13})/);
+    if (idMatch && idMatch[1]) {
+      const fileId = idMatch[1];
+      const files = fs.readdirSync(DOWNLOADS_DIR);
+      const matched = files.find(f => f.includes(fileId) && !f.endsWith('.part') && !f.endsWith('.ytdl'));
+      if (matched) {
+        filePath = path.join(DOWNLOADS_DIR, matched);
+      }
+    }
+  }
+
+  // 3. History database search
+  if (!fs.existsSync(filePath)) {
+    const history = readHistory();
+    const idMatch = rawFilename.match(/(\d{13})/);
+    const targetId = idMatch ? idMatch[1] : '';
+
+    const found = history.find(h => 
+      (targetId && h.id === targetId) ||
+      h.savedFile === rawFilename || 
+      h.filename === rawFilename || 
+      (h.filePath && h.filePath.includes(encodeURIComponent(rawFilename)))
+    );
+
+    if (found && found.savedFile && fs.existsSync(path.join(DOWNLOADS_DIR, found.savedFile))) {
+      filePath = path.join(DOWNLOADS_DIR, found.savedFile);
+    } else if (found && (found.directUrl || found.directAudioUrl || found.directVideoUrl)) {
+      const fallbackUrl = found.directUrl || found.directAudioUrl || found.directVideoUrl;
+      return res.redirect(302, fallbackUrl);
+    }
+  }
 
   if (fs.existsSync(filePath)) {
     const stat = fs.statSync(filePath);
     const fileSize = stat.size;
     const range = req.headers.range;
 
-    const ext = path.extname(rawFilename).toLowerCase();
+    const ext = path.extname(filePath).toLowerCase();
     const mimeTypes = {
       '.mp3': 'audio/mpeg',
       '.m4a': 'audio/mp4',
       '.wav': 'audio/wav',
+      '.opus': 'audio/opus',
+      '.aac': 'audio/aac',
       '.mp4': 'video/mp4',
       '.webm': 'video/webm',
       '.mkv': 'video/x-matroska'
@@ -129,19 +166,6 @@ app.get('/media/:filename', (req, res) => {
       fs.createReadStream(filePath).pipe(res);
     }
   } else {
-    // Check if filename matches any history item or direct stream fallback
-    const history = readHistory();
-    const found = history.find(h => 
-      h.savedFile === rawFilename || 
-      h.filename === rawFilename || 
-      (h.filePath && h.filePath.includes(encodeURIComponent(rawFilename)))
-    );
-
-    if (found && (found.directUrl || found.directAudioUrl || found.directVideoUrl)) {
-      const fallbackUrl = found.directUrl || found.directAudioUrl || found.directVideoUrl;
-      return res.redirect(302, fallbackUrl);
-    }
-
     res.status(404).send('Media file not found.');
   }
 });
