@@ -20,38 +20,37 @@
 ### A. Engine Ekstraksi Media Multi-Platform:
 1. **YouTube**:
    - Video Full HD (1080p, 720p, 4K) format MP4 & Audio MP3 320kbps.
-   - Menggunakan Node.js JS-Runtime & bypass engine binary.
 2. **TikTok**:
-   - Ekstraksi video HD **Tanpa Watermark** super cepat (< 1 detik).
+   - Ekstraksi video HD **Tanpa Watermark** super cepat (< 1 detik) dengan kalkulasi ukuran MB nyata.
    - Ekstraksi audio musik/sound asli TikTok.
-3. **Instagram**:
-   - Ekstraksi video dan Reels publik secara instan.
-   - Penanganan error ramah pengguna jika konten diproteksi login/private.
+3. **Instagram Reels & Video**:
+   - Engine ekstraksi multi-strategi (pembersihan query tracking `?igsh=...` & direct stream resolver).
+   - Ekstraksi Reels MP4 HD & Audio MP3.
 
 ### B. Pemutar Media In-App & Background Audio:
 1. **In-App Video Player Modal**:
-   - Modal video HTML5 bawaan dengan kontrol putar, layar penuh, dan tombol simpan langsung ke penyimpanan perangkat.
+   - Modal video HTML5 bawaan dengan tombol simpan langsung ke folder perangkat.
 2. **Floating Background Audio Player (MP3)**:
-   - Dock audio mengambang di atas bottom navbar dengan animasi piringan hitam (*vinyl disc*) yang berputar saat musik diputar.
-   - **MediaSession API Integration**: Audio tetap berjalan saat aplikasi di-minimize atau layar HP dimatikan (*Lockscreen Audio Controls* aktif di Android/Desktop).
+   - Dock audio mengambang dengan piringan hitam (*vinyl disc*) yang berputar.
+   - **MediaSession API Integration**: Audio tetap berjalan saat layar HP dimatikan.
 
 ### C. Manajemen Penyimpanan & Riwayat Unduhan:
 1. **Simpan ke Folder Native**:
-   - Tombol unduh langsung untuk menyimpan file video/audio ke folder `Downloads` perangkat pengguna (`/sdcard/Download/` di Android atau `Downloads` di PC).
+   - Unduh langsung ke folder Downloads perangkat (`/sdcard/Download/` di Android).
 2. **Fitur Hapus Selektif (*Multi-Delete*)**:
-   - Tombol **Delete** di header unduhan untuk masuk ke mode multi-select.
-   - Checkbox di setiap kartu media untuk memilih beberapa file sekaligus.
-   - **Floating Trash FAB**: Tombol tong sampah melayang di pojok kanan bawah yang posisinya aman dan anti-tabrakan dengan navbar (`bottom: 76px; right: 16px`).
-   - Dialog konfirmasi pop-up interaktif: *"Yakin ingin hapus?"* dengan pilihan tombol **Ya / Tidak**.
+   - Checkbox di setiap kartu media + Floating Trash FAB + Dialog konfirmasi interaktif.
 3. **Waktu Relatif Dinamis (*Relative Time Tracker*)**:
-   - Waktu unduhan dihitung secara akurat dan dinamis (*Baru saja*, *15 menit lalu*, *2 jam lalu*, *Kemarin*, *27 Agu 2026*).
+   - Menghitung waktu (*Baru saja*, *15 menit lalu*, *Kemarin*).
 
 ### D. Tampilan & UI/UX Minimalis (Zero AI-Slop):
-1. **Loading Screen Minimalis**:
-   - Bebas dari elemen ramai/fiksi ilmiah palsu.
-   - Menggunakan emblem VeloDrop dengan *breathing pulse* crimson dan progress bar garis tipis 3px.
-2. **Aturan Desain Ketat (*Zero Emojis*)**:
-   - 100% menggunakan pure SVG icons tajam. Tidak ada Unicode emoji di kode frontend maupun pesan teks pengguna.
+1. **Dynamic Platform Header**:
+   - Judul subpage, badge, hint target, dan placeholder otomatis menyesuaikan platform yang dipilih (YouTube, TikTok, Instagram).
+2. **Clean Hero Card**:
+   - Tampilan banner berkelas, kontras tinggi, dan rapi tanpa elemen sesak.
+3. **Smooth Navigation Transitions**:
+   - Transisi layar GPU-accelerated yang mulus tanpa lag.
+4. **Changelog Modal & Auto-Update Notification**:
+   - Riwayat versi rilis resmi di Pengaturan dan notifikasi otomatis saat rilis versi baru tersedia di GitHub.
 
 ### E. PWA & Native Android APK (Capacitor Engine):
 1. **Progressive Web App (PWA)**:
