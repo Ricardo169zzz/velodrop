@@ -916,17 +916,21 @@ app.post('/api/video/download', async (req, res) => {
     return res.status(503).json({ success: false, message: 'Engine binary sedang disiapkan. Silakan coba 5 detik lagi.' });
   }
 
+  // ponytail: robust ffmpeg detection - need directory, not binary path for --ffmpeg-location
   let effectiveFfmpeg = '';
   try {
     const { execSync } = require('child_process');
-    const sysFfmpeg = execSync(isWindows ? 'where ffmpeg' : 'which ffmpeg', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim().split('\n')[0].trim();
-    if (sysFfmpeg && fs.existsSync(sysFfmpeg)) effectiveFfmpeg = sysFfmpeg;
+    // Try system ffmpeg first
+    execSync(isWindows ? 'where ffmpeg' : 'ffmpeg -version', { stdio: 'ignore' });
+    effectiveFfmpeg = 'system'; // ffmpeg is in PATH, no --ffmpeg-location needed
   } catch (e) {}
   if (!effectiveFfmpeg && ffmpegPath && fs.existsSync(ffmpegPath)) {
-    effectiveFfmpeg = ffmpegPath;
+    effectiveFfmpeg = path.dirname(ffmpegPath); // --ffmpeg-location wants the directory
   }
 
   const outputTemplate = path.join(DOWNLOADS_DIR, `%(title).60s-${fileId}.%(ext)s`);
+  // ponytail: if no ffmpeg, don't request mp3 conversion - serve native audio format instead
+  const hasFfmpeg = !!effectiveFfmpeg;
   const formatArg = isAudio ? 'bestaudio/best' : 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
   const args = [
     '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
@@ -937,10 +941,10 @@ app.post('/api/video/download', async (req, res) => {
     '-o', outputTemplate
   ];
 
-  if (effectiveFfmpeg) {
+  if (effectiveFfmpeg && effectiveFfmpeg !== 'system') {
     args.push('--ffmpeg-location', effectiveFfmpeg);
   }
-  if (isAudio) {
+  if (isAudio && hasFfmpeg) {
     args.push('--extract-audio', '--audio-format', 'mp3');
   }
   args.push(url);
@@ -1077,12 +1081,21 @@ app.delete('/api/downloads', (req, res) => {
 // Diagnostic endpoint for debugging yt-dlp failures
 app.get('/api/debug/ytdlp', (req, res) => {
   const files = fs.readdirSync(DOWNLOADS_DIR).filter(f => f !== 'history.json');
+  let sysFfmpeg = false;
+  try {
+    const { execSync } = require('child_process');
+    execSync(isWindows ? 'where ffmpeg' : 'ffmpeg -version', { stdio: 'ignore' });
+    sysFfmpeg = true;
+  } catch (e) {}
   res.json({
     lastResult: lastYtDlpResult,
     downloadsDir: DOWNLOADS_DIR,
     filesOnDisk: files,
     ytdlpPath: YTDLP_PATH,
-    ytdlpExists: fs.existsSync(YTDLP_PATH)
+    ytdlpExists: fs.existsSync(YTDLP_PATH),
+    ffmpegStatic: ffmpegPath,
+    ffmpegStaticExists: ffmpegPath ? fs.existsSync(ffmpegPath) : false,
+    systemFfmpeg: sysFfmpeg
   });
 });
 
