@@ -549,6 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Add to local data immediately if not already present
       if (!downloadsData.some(d => d.id === optimisticId || d.filename === videoTitle)) {
         downloadsData.unshift(optimisticItem);
+        saveLocalDownloads(downloadsData);
         renderDownloadsList();
       }
 
@@ -600,10 +601,27 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ============================================================
-  // 7. DOWNLOADS LIST & REAL STORAGE MANAGEMENT
+  // 7. DOWNLOADS LIST & PERSISTENT STORAGE MANAGEMENT
   // ============================================================
+  const LOCAL_STORAGE_KEY = 'velodrop_local_downloads';
+
+  function getLocalDownloads() {
+    try {
+      const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveLocalDownloads(items) {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(items));
+    } catch (e) {}
+  }
+
   let currentCategory = 'all';
-  let downloadsData = [];
+  let downloadsData = getLocalDownloads();
   let isDeleteMode = false;
   const selectedDeleteIds = new Set();
 
@@ -631,10 +649,30 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch(`${API_BASE}/api/downloads`);
       const data = await res.json();
       if (data.success && Array.isArray(data.downloads)) {
-        downloadsData = data.downloads;
+        const localList = getLocalDownloads();
+        const mergedMap = new Map();
+
+        // 1. Masukkan item dari backend
+        data.downloads.forEach(item => {
+          if (item && (item.id || item.filename)) {
+            mergedMap.set(item.id || item.filename, item);
+          }
+        });
+
+        // 2. Pertahankan item lokal yang baru selesai diunduh
+        localList.forEach(item => {
+          const key = item.id || item.filename;
+          if (!mergedMap.has(key)) {
+            mergedMap.set(key, item);
+          }
+        });
+
+        downloadsData = Array.from(mergedMap.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        saveLocalDownloads(downloadsData);
       }
     } catch (err) {
       console.warn('Gagal memuat riwayat unduhan backend:', err);
+      downloadsData = getLocalDownloads();
     }
     renderDownloadsList();
   }
@@ -906,11 +944,14 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       // Exit delete mode & refresh
+      downloadsData = downloadsData.filter(item => !deleteList.includes(item.id));
+      saveLocalDownloads(downloadsData);
       selectedDeleteIds.clear();
       isDeleteMode = false;
       if (btnDeleteModeText) btnDeleteModeText.textContent = 'Delete';
       if (btnToggleDeleteMode) btnToggleDeleteMode.classList.remove('active-delete-mode');
       if (floatingDeleteFab) floatingDeleteFab.style.display = 'none';
+      renderDownloadsList();
       fetchBackendDownloads();
     });
   }
