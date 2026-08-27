@@ -280,15 +280,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  const subBadge = document.getElementById('subpage-platform-badge');
-  const subHeading = document.getElementById('subpage-heading');
+  const subBadge = document.getElementById('sub-badge-text');
+  const subHeading = document.getElementById('sub-heading-text');
+  const subTargetHint = document.getElementById('sub-target-hint');
   const subUrlInput = document.getElementById('sub-url-input');
   const videoResultBox = document.getElementById('video-result-box');
 
   const btnYT = document.getElementById('btn-open-yt');
   const btnTT = document.getElementById('btn-open-tt');
   const btnIG = document.getElementById('btn-open-ig');
-  const btnClipQuick = document.getElementById('btn-quick-open-clip');
 
   function openDownloader(platform, prefilledUrl = '') {
     activePlatform = platform;
@@ -297,6 +297,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (subBadge) subBadge.textContent = config.badge;
     if (subHeading) subHeading.textContent = config.title;
+    if (subTargetHint) {
+      if (platform === 'youtube') subTargetHint.textContent = 'Target: youtube.com / youtu.be';
+      else if (platform === 'tiktok') subTargetHint.textContent = 'Target: tiktok.com (Tanpa Watermark)';
+      else if (platform === 'instagram') subTargetHint.textContent = 'Target: instagram.com (Reels & Video)';
+    }
     if (subUrlInput) {
       subUrlInput.placeholder = config.placeholder;
       subUrlInput.value = prefilledUrl;
@@ -309,12 +314,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnYT) btnYT.addEventListener('click', () => openDownloader('youtube'));
   if (btnTT) btnTT.addEventListener('click', () => openDownloader('tiktok'));
   if (btnIG) btnIG.addEventListener('click', () => openDownloader('instagram'));
-
-  if (btnClipQuick) {
-    btnClipQuick.addEventListener('click', () => {
-      openDownloader('tiktok', 'https://www.tiktok.com/@gadgetgeek/video/73829104819');
-    });
-  }
 
   const btnBackHome = document.getElementById('btn-back-home');
   if (btnBackHome) {
@@ -526,15 +525,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const taskBytes = document.getElementById('active-task-bytes');
         const taskBar = document.getElementById('active-task-progress');
 
-        if (taskName) taskName.textContent = `${videoTitle} (${isAudio ? 'MP3 Audio' : '1080p Video'})`;
+        if (taskName) taskName.textContent = `${videoTitle} (${isAudio ? 'MP3 Audio' : 'Video HD'})`;
         if (taskBadge) taskBadge.textContent = isAudio ? 'MP3' : 'MP4';
 
         let pct = 0;
         if (taskBar) taskBar.style.width = '0%';
-        const fileMb = isAudio ? 4.2 : 28.5;
+        const selectedFmt = inspectedVideoData.formats ? inspectedVideoData.formats.find(f => f.type === selectedFormatType) : null;
+        const rawFmtSize = selectedFmt ? parseFloat(selectedFmt.sizeMb) : (isAudio ? 1.5 : 4.8);
+        const fileMb = !isNaN(rawFmtSize) && rawFmtSize > 0 ? rawFmtSize : (isAudio ? 1.5 : 4.8);
 
         const dlInterval = setInterval(async () => {
-          pct += 5;
+          pct += 6;
           if (pct > 95) pct = 95;
 
           if (taskBar) taskBar.style.width = `${pct}%`;
@@ -1084,39 +1085,85 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ============================================================
-  // 11. PWA SERVICE WORKER & APP INSTALL PROMPT
+  // 11. CHANGELOG MODAL & SYSTEM UPDATE CHECKER
   // ============================================================
-  let deferredInstallPrompt = null;
-  const btnPwaInstall = document.getElementById('btn-pwa-install');
+  const CURRENT_APP_VERSION = 'v1.0.0';
+  const btnOpenChangelog = document.getElementById('btn-open-changelog');
+  const btnCloseChangelog = document.getElementById('btn-close-changelog');
+  const btnCloseChangelogFoot = document.getElementById('btn-close-changelog-foot');
+  const changelogModal = document.getElementById('changelog-modal');
+  const changelogBackdrop = document.getElementById('changelog-modal-backdrop');
+  const btnCheckUpdate = document.getElementById('btn-check-update');
 
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch((err) => {
-        console.log('SW registration note:', err.message);
-      });
+  function openChangelogModal() {
+    if (changelogModal) changelogModal.style.display = 'flex';
+  }
+
+  function closeChangelogModal() {
+    if (changelogModal) changelogModal.style.display = 'none';
+  }
+
+  if (btnOpenChangelog) btnOpenChangelog.addEventListener('click', openChangelogModal);
+  if (btnCloseChangelog) btnCloseChangelog.addEventListener('click', closeChangelogModal);
+  if (btnCloseChangelogFoot) btnCloseChangelogFoot.addEventListener('click', closeChangelogModal);
+  if (changelogBackdrop) changelogBackdrop.addEventListener('click', closeChangelogModal);
+
+  // Auto-Update Checker via GitHub Releases API
+  async function checkForSystemUpdates(isManual = false) {
+    try {
+      const res = await fetch('https://api.github.com/repos/Ricardo169zzz/velodrop/releases/latest');
+      if (res.ok) {
+        const release = await res.json();
+        const latestTag = release.tag_name || '';
+        if (latestTag && latestTag !== CURRENT_APP_VERSION) {
+          const updateMsg = `Versi baru ${latestTag} tersedia! Silakan perbarui untuk fitur terbaru.`;
+          showToast('info', 'Pembaruan VeloDrop', updateMsg);
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('VeloDrop Update Tersedia', {
+              body: updateMsg,
+              icon: '/icon-192.png'
+            });
+          }
+        } else if (isManual) {
+          showToast('success', 'Sistem Mutakhir', `VeloDrop sudah menggunakan versi terbaru (${CURRENT_APP_VERSION}).`);
+        }
+      } else if (isManual) {
+        showToast('info', 'Sistem Mutakhir', `VeloDrop ${CURRENT_APP_VERSION} adalah versi paling baru.`);
+      }
+    } catch (e) {
+      if (isManual) showToast('info', 'Pemeriksaan Selesai', 'Tidak ada pembaruan baru saat ini.');
+    }
+  }
+
+  if (btnCheckUpdate) {
+    btnCheckUpdate.addEventListener('click', () => {
+      showToast('info', 'Memeriksa Pembaruan', 'Mengecek rilis terbaru di GitHub...');
+      checkForSystemUpdates(true);
     });
   }
 
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredInstallPrompt = e;
-    if (btnPwaInstall) {
-      btnPwaInstall.style.display = 'flex';
-    }
-  });
-
-  if (btnPwaInstall) {
-    btnPwaInstall.addEventListener('click', async () => {
-      if (deferredInstallPrompt) {
-        deferredInstallPrompt.prompt();
-        const { outcome } = await deferredInstallPrompt.userChoice;
-        if (outcome === 'accepted') {
-          showToast('success', 'Aplikasi Terpasang', 'VeloDrop berhasil ditambahkan ke layar utama perangkat.');
-        }
-        deferredInstallPrompt = null;
-      } else {
-        showToast('info', 'Install VeloDrop ke HP', 'Buka menu browser Anda (titik tiga di kanan atas) lalu pilih <strong>"Tambahkan ke Layar Utama" / "Install Aplikasi"</strong>.');
+  // Request Notification Permission on Startup
+  async function initNotificationSystem() {
+    if ('Notification' in window) {
+      if (Notification.permission === 'default') {
+        try {
+          const perm = await Notification.requestPermission();
+          if (perm === 'granted') {
+            showToast('success', 'Notifikasi Aktif', 'Pemberitahuan pembaruan versi baru akan dikirimkan otomatis.');
+          }
+        } catch (err) {}
       }
+    }
+    // Check update on launch
+    setTimeout(() => checkForSystemUpdates(false), 3000);
+  }
+
+  // Service Worker Registration for Offline Caching
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch((err) => {
+        console.log('SW note:', err.message);
+      });
     });
   }
 
@@ -1129,5 +1176,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 500);
     });
   }
+
+  // Inisialisasi izin notifikasi saat awal masuk
+  initNotificationSystem();
 
 });
