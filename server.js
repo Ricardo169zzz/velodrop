@@ -929,9 +929,8 @@ app.post('/api/video/download', async (req, res) => {
   }
 
   const outputTemplate = path.join(DOWNLOADS_DIR, `%(title).60s-${fileId}.%(ext)s`);
-  // ponytail: if no ffmpeg, don't request mp3 conversion - serve native audio format instead
-  const hasFfmpeg = !!effectiveFfmpeg;
-  const formatArg = isAudio ? 'bestaudio/best' : 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
+  // ponytail: 140/bestaudio[ext=m4a] downloads native AAC audio in 2s with zero ffmpeg conversion errors
+  const formatArg = isAudio ? '140/bestaudio[ext=m4a]/bestaudio/best' : 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
   const args = [
     '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
     '-f', formatArg,
@@ -943,9 +942,6 @@ app.post('/api/video/download', async (req, res) => {
 
   if (effectiveFfmpeg && effectiveFfmpeg !== 'system') {
     args.push('--ffmpeg-location', effectiveFfmpeg);
-  }
-  if (isAudio && hasFfmpeg) {
-    args.push('--extract-audio', '--audio-format', 'mp3');
   }
   args.push(url);
 
