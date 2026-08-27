@@ -1,0 +1,12 @@
+{
+  "appId": "com.velodrop.app",
+  "appName": "VeloDrop",
+  "webDir": "www",
+  "server": {
+    "url": "https://velodrop-production.up.railway.app",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}
