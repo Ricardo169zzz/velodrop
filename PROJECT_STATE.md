@@ -53,13 +53,17 @@
 2. **Aturan Desain Ketat (*Zero Emojis*)**:
    - 100% menggunakan pure SVG icons tajam. Tidak ada Unicode emoji di kode frontend maupun pesan teks pengguna.
 
-### E. PWA & Android APK Support:
+### E. PWA & Native Android APK (Capacitor Engine):
 1. **Progressive Web App (PWA)**:
-   - `manifest.json`, `sw.js` (Service Worker), dan icon PNG resolusi tinggi (`icon-192.png`, `icon-512.png`).
+   - `manifest.json`, `sw.js` (Service Worker), icon PNG resolusi tinggi (`icon-192.png`, `icon-512.png`), dan `display_override: ["standalone", "fullscreen"]`.
    - Bisa di-install langsung dari browser Chrome/Edge menjadi aplikasi mandiri di HP Android & PC.
-2. **Android APK Package**:
-   - Konfigurasi workflow GitHub Actions (`.github/workflows/build-apk.yml`).
-   - Kompatibel penuh dengan **PWABuilder** untuk menghasilkan file `.apk` siap pasang.
+2. **Capacitor Native Android Project**:
+   - Inisialisasi platform Android native (`android/`) dengan Gradle wrapper (`gradlew`).
+   - Ikon launcher Android resmi VeloDrop di seluruh folder `mipmap` (mdpi hingga xxxhdpi) dengan background obsidian dark `#08090C`.
+   - **Dark System Navigation Bar & Status Bar**: Bilah navigasi bawah HP (tombol back, home, recent apps) dan bilah status atas Android diwarnai `#08090C` sehingga menyatu 100% dengan tema aplikasi.
+   - Terhubung langsung ke live backend Railway (`https://velodrop-production.up.railway.app`).
+3. **Automated GitHub Release APK Workflow**:
+   - File `.github/workflows/build-apk.yml` otomatis meng-compile `VeloDrop-v1.0.0-debug.apk` dan mempublikasikannya langsung di **GitHub Releases**.
 
 ---
 
