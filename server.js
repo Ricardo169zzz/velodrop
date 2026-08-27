@@ -36,7 +36,76 @@ if (!fs.existsSync(HISTORY_FILE)) fs.writeFileSync(HISTORY_FILE, JSON.stringify(
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
-app.use('/media', express.static(DOWNLOADS_DIR));
+
+// Dedicated High-Performance Range 206 Streaming for Audio & Video
+app.get('/media/:filename', (req, res) => {
+  const rawFilename = decodeURIComponent(req.params.filename);
+  const filePath = path.join(DOWNLOADS_DIR, rawFilename);
+
+  if (fs.existsSync(filePath)) {
+    const stat = fs.statSync(filePath);
+    const fileSize = stat.size;
+    const range = req.headers.range;
+
+    const ext = path.extname(rawFilename).toLowerCase();
+    const mimeTypes = {
+      '.mp3': 'audio/mpeg',
+      '.m4a': 'audio/mp4',
+      '.wav': 'audio/wav',
+      '.mp4': 'video/mp4',
+      '.webm': 'video/webm',
+      '.mkv': 'video/x-matroska'
+    };
+    const contentType = mimeTypes[ext] || 'application/octet-stream';
+
+    if (range) {
+      const parts = range.replace(/bytes=/, "").split("-");
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+      if (start >= fileSize) {
+        res.status(416).send('Requested range not satisfiable\n' + start + ' >= ' + fileSize);
+        return;
+      }
+
+      const chunksize = (end - start) + 1;
+      const file = fs.createReadStream(filePath, { start, end });
+      const head = {
+        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': chunksize,
+        'Content-Type': contentType,
+        'Access-Control-Allow-Origin': '*'
+      };
+      res.writeHead(206, head);
+      file.pipe(res);
+    } else {
+      const head = {
+        'Content-Length': fileSize,
+        'Content-Type': contentType,
+        'Accept-Ranges': 'bytes',
+        'Access-Control-Allow-Origin': '*'
+      };
+      res.writeHead(200, head);
+      fs.createReadStream(filePath).pipe(res);
+    }
+  } else {
+    // Check if filename matches any history item or direct stream fallback
+    const history = readHistory();
+    const found = history.find(h => 
+      h.savedFile === rawFilename || 
+      h.filename === rawFilename || 
+      (h.filePath && h.filePath.includes(encodeURIComponent(rawFilename)))
+    );
+
+    if (found && (found.directUrl || found.directAudioUrl || found.directVideoUrl)) {
+      const fallbackUrl = found.directUrl || found.directAudioUrl || found.directVideoUrl;
+      return res.redirect(302, fallbackUrl);
+    }
+
+    res.status(404).send('Media file not found.');
+  }
+});
 
 // PWA Static Asset Routes
 app.get('/manifest.json', (req, res) => {

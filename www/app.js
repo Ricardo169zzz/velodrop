@@ -745,10 +745,16 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${day} ${month} ${year}`;
   }
 
-  function getMediaUrl(filePath) {
-    if (!filePath) return '';
-    if (filePath.startsWith('http://') || filePath.startsWith('https://')) return filePath;
-    return `${API_BASE}${filePath.startsWith('/') ? '' : '/'}${filePath}`;
+  function getMediaUrl(itemOrPath) {
+    if (!itemOrPath) return '';
+    if (typeof itemOrPath === 'string') {
+      if (itemOrPath.startsWith('http://') || itemOrPath.startsWith('https://')) return itemOrPath;
+      return `${API_BASE}${itemOrPath.startsWith('/') ? '' : '/'}${itemOrPath}`;
+    }
+    const path = itemOrPath.filePath || '';
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    if (path) return `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+    return itemOrPath.directUrl || itemOrPath.directAudioUrl || itemOrPath.directVideoUrl || '';
   }
 
   function renderDownloadsList() {
@@ -984,7 +990,7 @@ document.addEventListener('DOMContentLoaded', () => {
       updateAudioDockPlayState(false);
     }
 
-    const mediaUrl = getMediaUrl(item.filePath);
+    const mediaUrl = getMediaUrl(item);
     if (videoModalTitle) videoModalTitle.textContent = item.filename;
     inappVideoElement.src = mediaUrl;
     
@@ -992,6 +998,15 @@ document.addEventListener('DOMContentLoaded', () => {
       btnSaveVideoDevice.href = mediaUrl;
       btnSaveVideoDevice.download = item.savedFile || `${item.filename}.mp4`;
     }
+
+    inappVideoElement.onerror = () => {
+      const fallback = item.directUrl || item.directVideoUrl;
+      if (fallback && inappVideoElement.src !== fallback) {
+        console.log('Falling back to direct video stream:', fallback);
+        inappVideoElement.src = fallback;
+        inappVideoElement.play().catch(() => {});
+      }
+    };
 
     videoModal.style.display = 'flex';
     inappVideoElement.play().catch(e => console.log('Autoplay prevented:', e));
@@ -1048,8 +1063,18 @@ document.addEventListener('DOMContentLoaded', () => {
     currentPlayingAudio = item;
     if (audioDockTitle) audioDockTitle.textContent = item.filename;
     
-    const mediaUrl = getMediaUrl(item.filePath);
+    const mediaUrl = getMediaUrl(item);
     inappAudioElement.src = mediaUrl;
+
+    inappAudioElement.onerror = () => {
+      const fallback = item.directUrl || item.directAudioUrl || item.directVideoUrl;
+      if (fallback && inappAudioElement.src !== fallback) {
+        console.log('Falling back to direct audio stream:', fallback);
+        inappAudioElement.src = fallback;
+        inappAudioElement.play().then(() => updateAudioDockPlayState(true)).catch(() => {});
+      }
+    };
+
     inappAudioElement.play().then(() => {
       updateAudioDockPlayState(true);
     }).catch(e => console.log('Audio autoplay prevented:', e));
