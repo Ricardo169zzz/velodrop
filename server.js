@@ -433,10 +433,152 @@ app.post('/api/video/inspect', async (req, res) => {
       } catch (igErr) {
         console.warn('Instagram direct API fallback to yt-dlp:', igErr.message);
       }
+
+      // Strategy B: Instagram official public oEmbed
+      try {
+        const oembedRes = await fetch(`https://api.instagram.com/oembed/?url=${encodeURIComponent(cleanIgUrl)}`);
+        if (oembedRes.ok) {
+          const odata = await oembedRes.json();
+          if (odata && (odata.title || odata.author_name)) {
+            const author = odata.author_name || 'Instagram Creator';
+            const title = odata.title || 'Instagram Reels Video HD';
+            const thumb = odata.thumbnail_url || '';
+
+            return res.json({
+              success: true,
+              data: {
+                id: shortcode,
+                title: title.slice(0, 80) || 'Instagram Reels Video HD',
+                uploader: author,
+                thumbnail: thumb,
+                duration: '00:30',
+                durationSeconds: 30,
+                webpageUrl: cleanIgUrl,
+                formats: [
+                  {
+                    id: 'ig_hd',
+                    label: 'Video Reels MP4 HD',
+                    tag: 'REELS HD',
+                    sizeMb: '6.5',
+                    type: 'video'
+                  },
+                  {
+                    id: 'ig_audio',
+                    label: 'Audio MP3 (Soundtrack)',
+                    tag: 'AUDIO MP3',
+                    sizeMb: '1.2',
+                    type: 'audio'
+                  }
+                ]
+              }
+            });
+          }
+        }
+      } catch (oembedErr) {
+        console.warn('Instagram oEmbed fallback error:', oembedErr.message);
+      }
     }
   }
 
-  // --- YOUTUBE & GENERAL EXTRACTION VIA YT-DLP ---
+  // --- YOUTUBE OPTIMIZED PURE NODE.JS EXTRACTION ---
+  const isYouTube = /youtube\.com|youtu\.be/i.test(url);
+  if (isYouTube) {
+    const ytMatch = url.match(/(?:v=|\/shorts\/|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/i);
+    const videoId = ytMatch ? ytMatch[1] : '';
+
+    if (videoId) {
+      try {
+        let ytTitle = '';
+        let ytAuthor = '';
+        let ytDurationSec = 180;
+        let ytDirectVideoUrl = '';
+
+        // 1. YouTube oEmbed
+        try {
+          const oembedRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+          if (oembedRes.ok) {
+            const odata = await oembedRes.json();
+            ytTitle = odata.title;
+            ytAuthor = odata.author_name;
+          }
+        } catch (e) {}
+
+        // 2. Fetch watch page & ytInitialPlayerResponse
+        try {
+          const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+              'Accept-Language': 'en-US,en;q=0.9'
+            }
+          });
+          if (pageRes.ok) {
+            const html = await pageRes.text();
+            const playerMatch = html.match(/ytInitialPlayerResponse\s*=\s*({.+?});(?:var|<\/script)/);
+            if (playerMatch) {
+              const player = JSON.parse(playerMatch[1]);
+              const details = player.videoDetails;
+              if (details) {
+                if (!ytTitle) ytTitle = details.title;
+                if (!ytAuthor) ytAuthor = details.author;
+                if (details.lengthSeconds) ytDurationSec = parseInt(details.lengthSeconds, 10);
+              }
+              const streamingData = player.streamingData;
+              if (streamingData && streamingData.formats && streamingData.formats.length > 0) {
+                const f18 = streamingData.formats.find(f => f.itag === 18 || f.url) || streamingData.formats[0];
+                if (f18 && f18.url) {
+                  ytDirectVideoUrl = f18.url;
+                }
+              }
+            }
+          }
+        } catch (e) {}
+
+        if (ytTitle) {
+          const durSec = ytDurationSec || 180;
+          const mins = Math.floor(durSec / 60);
+          const secs = Math.floor(durSec % 60);
+          const durationFormatted = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+          const videoMb = (durSec * 0.16).toFixed(1);
+          const audioMb = (durSec * 0.025).toFixed(1);
+
+          return res.json({
+            success: true,
+            data: {
+              id: videoId,
+              title: ytTitle,
+              uploader: ytAuthor || 'YouTube Creator',
+              thumbnail: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+              duration: durationFormatted,
+              durationSeconds: durSec,
+              webpageUrl: `https://www.youtube.com/watch?v=${videoId}`,
+              directVideoUrl: ytDirectVideoUrl,
+              directAudioUrl: ytDirectVideoUrl,
+              formats: [
+                {
+                  id: 'yt_mp4_hd',
+                  label: 'Video MP4 HD (1080p / 720p)',
+                  tag: 'MP4 HD',
+                  sizeMb: videoMb,
+                  type: 'video'
+                },
+                {
+                  id: 'yt_mp3_audio',
+                  label: 'Audio MP3 (320kbps Audio)',
+                  tag: 'AUDIO MP3',
+                  sizeMb: audioMb,
+                  type: 'audio'
+                }
+              ]
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('YouTube pure Node extraction fallback:', err.message);
+      }
+    }
+  }
+
+  // --- GENERAL EXTRACTION VIA YT-DLP FALLBACK ---
   if (!fs.existsSync(YTDLP_PATH)) {
     return res.status(503).json({
       success: false,
