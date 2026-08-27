@@ -18,7 +18,9 @@ const PORT = process.env.PORT || 3344;
 const BIN_DIR = path.join(__dirname, 'bin');
 const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
 const HISTORY_FILE = path.join(DOWNLOADS_DIR, 'history.json');
-const YTDLP_PATH = path.join(BIN_DIR, 'yt-dlp.exe');
+const isWindows = process.platform === 'win32';
+const YTDLP_BIN_NAME = isWindows ? 'yt-dlp.exe' : 'yt-dlp';
+const YTDLP_PATH = path.join(BIN_DIR, YTDLP_BIN_NAME);
 
 // Ensure required directories exist
 if (!fs.existsSync(BIN_DIR)) fs.mkdirSync(BIN_DIR, { recursive: true });
@@ -28,75 +30,107 @@ if (!fs.existsSync(HISTORY_FILE)) fs.writeFileSync(HISTORY_FILE, JSON.stringify(
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname)));
 app.use('/media', express.static(DOWNLOADS_DIR));
 
 // Helper: Read & Write History
 function readHistory() {
   try {
-    if (fs.existsSync(HISTORY_FILE)) {
-      const data = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8'));
-      if (Array.isArray(data)) {
-        return data.filter(item => {
-          if (!item.savedFile) return true;
-          return fs.existsSync(path.join(DOWNLOADS_DIR, item.savedFile));
-        });
-      }
-    }
+    if (!fs.existsSync(HISTORY_FILE)) return [];
+    return JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8') || '[]');
   } catch (err) {
-    console.error('Error reading history:', err);
+    return [];
   }
-  return [];
 }
 
 function writeHistory(data) {
   try {
     fs.writeFileSync(HISTORY_FILE, JSON.stringify(data, null, 2));
   } catch (err) {
-    console.error('Error writing history:', err);
+    console.error('Gagal menulis riwayat:', err.message);
   }
 }
 
-// Helper: Direct Stream Downloader with Native Fetch (Auto Redirects)
-async function downloadDirectStream(streamUrl, targetFilePath, callback) {
-  try {
-    const response = await fetch(streamUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-        'Referer': 'https://www.tiktok.com/'
+// Helper: Direct Stream Downloader with Redirect & Content-Length handling
+async function downloadDirectStream(streamUrl, targetFilePath, onProgress) {
+  return new Promise((resolve, reject) => {
+    function tryFetch(currentUrl, redirectCount = 0) {
+      if (redirectCount > 8) {
+        return reject(new Error('Terlalu banyak redirect jaringan.'));
       }
-    });
 
-    if (!response.ok) {
-      return callback(new Error(`Download failed: HTTP ${response.status}`));
+      const client = currentUrl.startsWith('https') ? https : http;
+      const parsed = new URL(currentUrl);
+
+      const options = {
+        hostname: parsed.hostname,
+        port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+        path: parsed.pathname + parsed.search,
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+          'Accept': '*/*',
+          'Referer': 'https://www.tiktok.com/'
+        }
+      };
+
+      const req = client.request(options, (res) => {
+        if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
+          let nextUrl = res.headers.location;
+          if (nextUrl.startsWith('/')) {
+            nextUrl = `${parsed.protocol}//${parsed.host}${nextUrl}`;
+          }
+          return tryFetch(nextUrl, redirectCount + 1);
+        }
+
+        if (res.statusCode !== 200) {
+          return reject(new Error(`Server merespons status ${res.statusCode}`));
+        }
+
+        const totalBytes = parseInt(res.headers['content-length'] || '0', 10);
+        let downloadedBytes = 0;
+        const fileStream = fs.createWriteStream(targetFilePath);
+
+        res.on('data', (chunk) => {
+          downloadedBytes += chunk.length;
+          if (onProgress && totalBytes > 0) {
+            const percent = Math.min(100, Math.round((downloadedBytes / totalBytes) * 100));
+            onProgress(percent, downloadedBytes, totalBytes);
+          }
+        });
+
+        res.pipe(fileStream);
+
+        fileStream.on('finish', () => {
+          fileStream.close(() => resolve(targetFilePath));
+        });
+
+        fileStream.on('error', (err) => {
+          try { fs.unlinkSync(targetFilePath); } catch (e) {}
+          reject(err);
+        });
+      });
+
+      req.on('error', (err) => {
+        try { fs.unlinkSync(targetFilePath); } catch (e) {}
+        reject(err);
+      });
+
+      req.end();
     }
 
-    const arrayBuf = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuf);
-    fs.writeFileSync(targetFilePath, buffer);
-    callback(null, targetFilePath);
-  } catch (err) {
-    callback(err);
-  }
+    tryFetch(streamUrl);
+  });
 }
 
 // ============================================================
-// 1. ENGINE HEALTH & SETUP API
+// 1. ENGINE ASSET INITIALIZATION & TELEMETRY STREAM
 // ============================================================
 
 app.get('/api/engine/status', (req, res) => {
   const isInstalled = fs.existsSync(YTDLP_PATH);
-  let sizeMb = 0;
-  if (isInstalled) {
-    const stats = fs.statSync(YTDLP_PATH);
-    sizeMb = (stats.size / (1024 * 1024)).toFixed(1);
-  }
-
   res.json({
     installed: isInstalled,
-    binaryPath: isInstalled ? YTDLP_PATH : null,
-    sizeMb: isInstalled ? sizeMb : 0,
-    version: isInstalled ? '2026.08.20' : null,
     status: isInstalled ? 'READY' : 'NEEDS_SETUP'
   });
 });
@@ -124,8 +158,10 @@ app.get('/api/engine/setup-stream', (req, res) => {
     return;
   }
 
-  const YTDLP_URL = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe';
-  const tempFile = path.join(BIN_DIR, 'yt-dlp.exe.download');
+  const YTDLP_URL = isWindows
+    ? 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe'
+    : 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp';
+  const tempFile = path.join(BIN_DIR, `${YTDLP_BIN_NAME}.download`);
 
   sendEvent('progress', {
     stage: 'INIT',
@@ -136,16 +172,10 @@ app.get('/api/engine/setup-stream', (req, res) => {
     totalBytes: 24800000
   });
 
-  function downloadFile(url, redirects = 0) {
-    if (redirects > 5) {
-      sendEvent('error', { message: 'Terlalu banyak redirect jaringan.' });
-      res.end();
-      return;
-    }
-
+  function downloadFile(url) {
     const request = https.get(url, (response) => {
       if (response.statusCode === 301 || response.statusCode === 302 || response.statusCode === 307) {
-        downloadFile(response.headers.location, redirects + 1);
+        downloadFile(response.headers.location);
         return;
       }
 
@@ -178,12 +208,13 @@ app.get('/api/engine/setup-stream', (req, res) => {
           if (percent > 90) stageLabel = 'Platform Decryption Rules (2.1 MB)';
 
           sendEvent('progress', {
-            stage: stageLabel,
+            stage: 'DOWNLOADING',
+            stageLabel,
             message: `Mengunduh ${stageLabel}...`,
-            percent: percent,
+            percent,
             speed: `${speed} MB/s`,
             bytesDownloaded: downloadedBytes,
-            totalBytes: totalBytes
+            totalBytes
           });
 
           lastTime = now;
@@ -193,18 +224,20 @@ app.get('/api/engine/setup-stream', (req, res) => {
 
       fileStream.on('finish', () => {
         fileStream.close(() => {
-          if (fs.existsSync(YTDLP_PATH)) fs.unlinkSync(YTDLP_PATH);
-          fs.renameSync(tempFile, YTDLP_PATH);
-
+          if (fs.existsSync(tempFile)) {
+            fs.renameSync(tempFile, YTDLP_PATH);
+            if (!isWindows) {
+              try { fs.chmodSync(YTDLP_PATH, 0o755); } catch (e) {}
+            }
+          }
           sendEvent('progress', {
             stage: 'COMPLETE',
-            message: 'Seluruh asset core berhasil diverifikasi!',
+            message: 'Pemasangan binary selesai.',
             percent: 100,
-            speed: 'Selesai',
+            speed: '0.0 MB/s',
             bytesDownloaded: totalBytes,
-            totalBytes: totalBytes
+            totalBytes
           });
-
           sendEvent('done', { success: true });
           res.end();
         });
