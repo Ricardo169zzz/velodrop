@@ -8,8 +8,8 @@
 ## 📌 1. Informasi Umum & Repositori
 
 - **Nama Projek**: VeloDrop (High-Velocity Media Ingest & Downloader)
-- **Versi Aktif**: `v1.1.0` (Native Offline-First Android APK + FFmpeg Cloud Engine)
-- **Tujuan Utama**: Aplikasi web & mobile untuk mengunduh video dan audio kualitas tinggi dari YouTube, TikTok (Tanpa Watermark), dan Instagram, dilengkapi pemutar in-app dan background audio.
+- **Versi Aktif**: `v1.1.0` (Native Offline-First Android APK + Range 206 Cloud Streaming Engine)
+- **Tujuan Utama**: Aplikasi web & mobile untuk mengunduh video dan audio kualitas tinggi dari YouTube, TikTok (Tanpa Watermark), dan Instagram, dilengkapi pemutar in-app dan background audio playback.
 - **GitHub Repository**: [https://github.com/Ricardo169zzz/velodrop](https://github.com/Ricardo169zzz/velodrop)
 - **Live Production URL (Railway)**: [https://velodrop-production.up.railway.app](https://velodrop-production.up.railway.app)
 - **Port Lokal**: `3344` (`http://localhost:3344`)
@@ -20,27 +20,31 @@
 
 ### A. Engine Ekstraksi Media Multi-Platform:
 1. **YouTube**:
-   - Video Full HD (1080p, 720p, 4K) format MP4 & Audio MP3 320kbps.
+   - Innertube Web API + oEmbed ultra-cepat (<200ms) tanpa dependensi python saat inspeksi.
+   - Video Full HD (1080p, 720p, 4K) format MP4 & Audio MP3 320kbps via FFmpeg integration.
 2. **TikTok**:
    - Ekstraksi video HD **Tanpa Watermark** super cepat (< 1 detik) dengan kalkulasi ukuran MB nyata.
-   - Ekstraksi audio musik/sound asli TikTok.
+   - Ekstraksi audio musik/sound asli TikTok via TikWM direct stream resolver.
 3. **Instagram Reels & Video**:
-   - Engine ekstraksi multi-strategi (pembersihan query tracking `?igsh=...` & direct stream resolver).
+   - Engine ekstraksi multi-strategi (pembersihan query tracking `?igsh=...`, oEmbed & direct stream parser).
    - Ekstraksi Reels MP4 HD & Audio MP3.
 
 ### B. Pemutar Media In-App & Background Audio:
 1. **In-App Video Player Modal**:
-   - Modal video HTML5 bawaan dengan tombol simpan langsung ke folder perangkat.
+   - Modal video HTML5 bawaan dengan HTTP Range 206 streaming dan tombol simpan langsung ke folder perangkat.
 2. **Floating Background Audio Player (MP3)**:
    - Dock audio mengambang dengan piringan hitam (*vinyl disc*) yang berputar.
-   - **MediaSession API Integration**: Audio tetap berjalan saat layar HP dimatikan.
+   - **Android Native Background Audio**: Menggunakan WebView timer resume dan lifecycle hooks di `MainActivity.java` sehingga audio tetap berputar saat aplikasi di-minimize atau layar dimatikan.
+   - **MediaSession API Integration**: Terhubung ke lockscreen notification tray Android untuk tombol Play / Pause / Seek bar.
 
 ### C. Manajemen Penyimpanan & Riwayat Unduhan:
-1. **Simpan ke Folder Native**:
+1. **Dual LocalStorage & Server Persistence**:
+   - Riwayat unduhan disimpan permanen di LocalStorage perangkat dan disinkronkan (*smart merge*) dengan backend.
+2. **Simpan ke Folder Native**:
    - Unduh langsung ke folder Downloads perangkat (`/sdcard/Download/` di Android).
-2. **Fitur Hapus Selektif (*Multi-Delete*)**:
+3. **Fitur Hapus Selektif (*Multi-Delete*)**:
    - Checkbox di setiap kartu media + Floating Trash FAB + Dialog konfirmasi interaktif.
-3. **Waktu Relatif Dinamis (*Relative Time Tracker*)**:
+4. **Waktu Relatif Dinamis (*Relative Time Tracker*)**:
    - Menghitung waktu (*Baru saja*, *15 menit lalu*, *Kemarin*).
 
 ### D. Tampilan & UI/UX Minimalis (Zero AI-Slop):
@@ -61,9 +65,10 @@
    - Inisialisasi platform Android native (`android/`) dengan Gradle wrapper (`gradlew`).
    - Ikon launcher Android resmi VeloDrop di seluruh folder `mipmap` (mdpi hingga xxxhdpi) dengan background obsidian dark `#08090C`.
    - **Dark System Navigation Bar & Status Bar**: Bilah navigasi bawah HP (tombol back, home, recent apps) dan bilah status atas Android diwarnai `#08090C` sehingga menyatu 100% dengan tema aplikasi.
+   - Izin `WAKE_LOCK`, `FOREGROUND_SERVICE`, dan `FOREGROUND_SERVICE_MEDIA_PLAYBACK` untuk pemutaran audio di background.
    - Terhubung langsung ke live backend Railway (`https://velodrop-production.up.railway.app`).
 3. **Automated GitHub Release APK Workflow**:
-   - File `.github/workflows/build-apk.yml` otomatis meng-compile `VeloDrop-v1.0.0-debug.apk` dan mempublikasikannya langsung di **GitHub Releases**.
+   - File `.github/workflows/build-apk.yml` otomatis meng-compile `VeloDrop-v1.1.0-debug.apk` dan mempublikasikannya langsung di **GitHub Releases**.
 
 ---
 
