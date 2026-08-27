@@ -491,47 +491,58 @@ app.post('/api/video/inspect', async (req, res) => {
         let ytTitle = '';
         let ytAuthor = '';
         let ytDurationSec = 180;
+        let ytThumb = `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
         let ytDirectVideoUrl = '';
 
-        // 1. YouTube oEmbed
+        // Strategy A: Innertube Web API (Ultra Fast & Bot-Proof)
         try {
-          const oembedRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
-          if (oembedRes.ok) {
-            const odata = await oembedRes.json();
-            ytTitle = odata.title;
-            ytAuthor = odata.author_name;
-          }
-        } catch (e) {}
-
-        // 2. Fetch watch page & ytInitialPlayerResponse
-        try {
-          const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+          const innertubeRes = await fetch('https://www.youtube.com/youtubei/v1/player?prettyPrint=false', {
+            method: 'POST',
             headers: {
+              'Content-Type': 'application/json',
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-              'Accept-Language': 'en-US,en;q=0.9'
-            }
-          });
-          if (pageRes.ok) {
-            const html = await pageRes.text();
-            const playerMatch = html.match(/ytInitialPlayerResponse\s*=\s*({.+?});(?:var|<\/script)/);
-            if (playerMatch) {
-              const player = JSON.parse(playerMatch[1]);
-              const details = player.videoDetails;
-              if (details) {
-                if (!ytTitle) ytTitle = details.title;
-                if (!ytAuthor) ytAuthor = details.author;
-                if (details.lengthSeconds) ytDurationSec = parseInt(details.lengthSeconds, 10);
-              }
-              const streamingData = player.streamingData;
-              if (streamingData && streamingData.formats && streamingData.formats.length > 0) {
-                const f18 = streamingData.formats.find(f => f.itag === 18 || f.url) || streamingData.formats[0];
-                if (f18 && f18.url) {
-                  ytDirectVideoUrl = f18.url;
+              'X-YouTube-Client-Name': '1',
+              'X-YouTube-Client-Version': '2.20240726.00.00'
+            },
+            body: JSON.stringify({
+              videoId: videoId,
+              context: {
+                client: {
+                  clientName: 'WEB',
+                  clientVersion: '2.20240726.00.00',
+                  hl: 'en',
+                  gl: 'US'
                 }
               }
+            })
+          });
+
+          if (innertubeRes.ok) {
+            const iData = await innertubeRes.json();
+            const vDetails = iData.videoDetails;
+            if (vDetails) {
+              ytTitle = vDetails.title || '';
+              ytAuthor = vDetails.author || '';
+              if (vDetails.lengthSeconds) ytDurationSec = parseInt(vDetails.lengthSeconds, 10);
+              const thumbs = vDetails.thumbnail?.thumbnails || [];
+              if (thumbs.length > 0) ytThumb = thumbs[thumbs.length - 1].url;
             }
           }
-        } catch (e) {}
+        } catch (iErr) {
+          console.warn('Innertube API fallback:', iErr.message);
+        }
+
+        // Strategy B: YouTube oEmbed Fallback
+        if (!ytTitle) {
+          try {
+            const oembedRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+            if (oembedRes.ok) {
+              const odata = await oembedRes.json();
+              ytTitle = odata.title || '';
+              ytAuthor = odata.author_name || '';
+            }
+          } catch (e) {}
+        }
 
         if (ytTitle) {
           const durSec = ytDurationSec || 180;
@@ -547,7 +558,7 @@ app.post('/api/video/inspect', async (req, res) => {
               id: videoId,
               title: ytTitle,
               uploader: ytAuthor || 'YouTube Creator',
-              thumbnail: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+              thumbnail: ytThumb,
               duration: durationFormatted,
               durationSeconds: durSec,
               webpageUrl: `https://www.youtube.com/watch?v=${videoId}`,
@@ -573,7 +584,7 @@ app.post('/api/video/inspect', async (req, res) => {
           });
         }
       } catch (err) {
-        console.warn('YouTube pure Node extraction fallback:', err.message);
+        console.warn('YouTube pure Node extraction error:', err.message);
       }
     }
   }
