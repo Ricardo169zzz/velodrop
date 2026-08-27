@@ -1,0 +1,101 @@
+# VeloDrop - Project State & Architecture Summary ⚡
+
+> **Dokumentasi Progres & Status Akhir Projek VeloDrop**  
+> Gunakan file ini sebagai titik acuan utama (*context handover*) setiap kali memulai sesi obrolan baru.
+
+---
+
+## 📌 1. Informasi Umum & Repositori
+
+- **Nama Projek**: VeloDrop (High-Velocity Media Ingest & Downloader)
+- **Tujuan Utama**: Aplikasi web & mobile untuk mengunduh video dan audio kualitas tinggi dari YouTube, TikTok (Tanpa Watermark), dan Instagram, dilengkapi pemutar in-app dan background audio.
+- **GitHub Repository**: [https://github.com/Ricardo169zzz/velodrop](https://github.com/Ricardo169zzz/velodrop)
+- **Live Production URL (Railway)**: [https://velodrop-production.up.railway.app](https://velodrop-production.up.railway.app)
+- **Port Lokal**: `3344` (`http://localhost:3344`)
+
+---
+
+## ✨ 2. Fitur-Fitur yang Sudah Selesai & Aktif 100%
+
+### A. Engine Ekstraksi Media Multi-Platform:
+1. **YouTube**:
+   - Video Full HD (1080p, 720p, 4K) format MP4 & Audio MP3 320kbps.
+   - Menggunakan Node.js JS-Runtime & bypass engine binary.
+2. **TikTok**:
+   - Ekstraksi video HD **Tanpa Watermark** super cepat (< 1 detik).
+   - Ekstraksi audio musik/sound asli TikTok.
+3. **Instagram**:
+   - Ekstraksi video dan Reels publik secara instan.
+   - Penanganan error ramah pengguna jika konten diproteksi login/private.
+
+### B. Pemutar Media In-App & Background Audio:
+1. **In-App Video Player Modal**:
+   - Modal video HTML5 bawaan dengan kontrol putar, layar penuh, dan tombol simpan langsung ke penyimpanan perangkat.
+2. **Floating Background Audio Player (MP3)**:
+   - Dock audio mengambang di atas bottom navbar dengan animasi piringan hitam (*vinyl disc*) yang berputar saat musik diputar.
+   - **MediaSession API Integration**: Audio tetap berjalan saat aplikasi di-minimize atau layar HP dimatikan (*Lockscreen Audio Controls* aktif di Android/Desktop).
+
+### C. Manajemen Penyimpanan & Riwayat Unduhan:
+1. **Simpan ke Folder Native**:
+   - Tombol unduh langsung untuk menyimpan file video/audio ke folder `Downloads` perangkat pengguna (`/sdcard/Download/` di Android atau `Downloads` di PC).
+2. **Fitur Hapus Selektif (*Multi-Delete*)**:
+   - Tombol **Delete** di header unduhan untuk masuk ke mode multi-select.
+   - Checkbox di setiap kartu media untuk memilih beberapa file sekaligus.
+   - **Floating Trash FAB**: Tombol tong sampah melayang di pojok kanan bawah yang posisinya aman dan anti-tabrakan dengan navbar (`bottom: 76px; right: 16px`).
+   - Dialog konfirmasi pop-up interaktif: *"Yakin ingin hapus?"* dengan pilihan tombol **Ya / Tidak**.
+3. **Waktu Relatif Dinamis (*Relative Time Tracker*)**:
+   - Waktu unduhan dihitung secara akurat dan dinamis (*Baru saja*, *15 menit lalu*, *2 jam lalu*, *Kemarin*, *27 Agu 2026*).
+
+### D. Tampilan & UI/UX Minimalis (Zero AI-Slop):
+1. **Loading Screen Minimalis**:
+   - Bebas dari elemen ramai/fiksi ilmiah palsu.
+   - Menggunakan emblem VeloDrop dengan *breathing pulse* crimson dan progress bar garis tipis 3px.
+2. **Aturan Desain Ketat (*Zero Emojis*)**:
+   - 100% menggunakan pure SVG icons tajam. Tidak ada Unicode emoji di kode frontend maupun pesan teks pengguna.
+
+### E. PWA & Android APK Support:
+1. **Progressive Web App (PWA)**:
+   - `manifest.json`, `sw.js` (Service Worker), dan icon PNG resolusi tinggi (`icon-192.png`, `icon-512.png`).
+   - Bisa di-install langsung dari browser Chrome/Edge menjadi aplikasi mandiri di HP Android & PC.
+2. **Android APK Package**:
+   - Konfigurasi workflow GitHub Actions (`.github/workflows/build-apk.yml`).
+   - Kompatibel penuh dengan **PWABuilder** untuk menghasilkan file `.apk` siap pasang.
+
+---
+
+## 📁 3. Struktur File & Tanggung Jawab
+
+| File / Folder | Fungsi & Deskripsi |
+| :--- | :--- |
+| `index.html` | Struktur antarmuka modular 3 layar (*Splash Loading*, *Home Platform Hub*, *Downloads*, *Settings*) serta komponen player dan modal delete. |
+| `style.css` | Sistem desain lengkap, tema obsidian dark, aksen crimson (`#DC2626`), animasi vinyl, floating FAB, dan modal pop-up. |
+| `app.js` | Logika frontend, event handler, inspect link, dispatcher download, player video/audio, MediaSession API, dynamic relative time, dan PWA installer. |
+| `server.js` | Backend Express.js, router API `/api/video/inspect`, `/api/video/download`, `/api/downloads`, `/api/downloads/delete-items`, dan auto-setup binary. |
+| `manifest.json` | Konfigurasi PWA (nama aplikasi, domain start URL, icons, standalone mode). |
+| `sw.js` | Service Worker untuk caching asset statis dan PWA support. |
+| `downloads/` | Folder penyimpanan file media dan file riwayat database lokal `history.json`. |
+| `bin/` | Folder binary `yt-dlp` (otomatis disiapkan oleh server). |
+| `.github/workflows/build-apk.yml` | Workflow GitHub Actions untuk build APK otomatis di cloud. |
+
+---
+
+## 🛠️ 4. Panduan Menjalankan Secara Lokal
+
+```bash
+# 1. Masuk direktori
+cd "e:\Aplikasi Chat"
+
+# 2. Pasang dependensi
+npm install
+
+# 3. Jalankan server lokal
+node server.js
+```
+Akses di browser: **`http://localhost:3344`**
+
+---
+
+## 📝 5. Catatan untuk Sesi Obrolan Selanjutnya
+- **Aturan Zero-Emoji:** Pertahankan aturan tidak menggunakan emoji Unicode (gunakan tag `<svg>` untuk semua ikon).
+- **Backend Stability:** Server mendukung multi-platform (Windows & Linux Cloud Hosting).
+- **Live URL:** URL Railway aktif di `https://velodrop-production.up.railway.app`.
