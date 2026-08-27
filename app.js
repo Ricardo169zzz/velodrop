@@ -5,9 +5,10 @@
 
 document.addEventListener('DOMContentLoaded', () => {
 
-  // ============================================================
-  // 1. TOAST NOTIFICATION SYSTEM (SINGLE-INSTANCE SWAP, ZERO EMOJIS)
-  // ============================================================
+  // Dynamic API Base: seamlessly connects standalone APK / Local / Cloud
+  const API_BASE = (window.location.protocol === 'http:' || window.location.protocol === 'https:') && !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')
+    ? ''
+    : 'https://velodrop-production.up.railway.app';
   const toastContainer = document.getElementById('toast-container');
   let currentToastTimeout = null;
 
@@ -389,7 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btnSubmitCheck.style.opacity = '0.75';
 
       try {
-        const response = await fetch('/api/video/inspect', {
+        const response = await fetch(`${API_BASE}/api/video/inspect`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url, platform: activePlatform })
@@ -498,7 +499,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Trigger Backend Download
       try {
-        await fetch('/api/video/download', {
+        await fetch(`${API_BASE}/api/video/download`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -543,7 +544,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if (taskSpeed) taskSpeed.textContent = `${(5.4 + Math.random() * 2.8).toFixed(1)} MB/s`;
 
           // Periodically check if backend has completed and written file
-          const checkRes = await fetch('/api/downloads').then(r => r.json()).catch(() => ({ downloads: [] }));
+          const checkRes = await fetch(`${API_BASE}/api/downloads`).then(r => r.json()).catch(() => ({ downloads: [] }));
           const isFinished = checkRes.downloads && checkRes.downloads.some(d => d.filename === videoTitle || d.title === videoTitle);
 
           if (isFinished || pct >= 95) {
@@ -595,7 +596,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchBackendDownloads() {
     try {
-      const res = await fetch('/api/downloads');
+      const res = await fetch(`${API_BASE}/api/downloads`);
       const data = await res.json();
       if (data.success && Array.isArray(data.downloads)) {
         downloadsData = data.downloads;
@@ -851,7 +852,7 @@ document.addEventListener('DOMContentLoaded', () => {
       closeConfirmModal();
 
       try {
-        const res = await fetch('/api/downloads/delete-items', {
+        const res = await fetch(`${API_BASE}/api/downloads/delete-items`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ids: deleteList })
