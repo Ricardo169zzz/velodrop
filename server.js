@@ -50,6 +50,19 @@ app.get('/sw.js', (req, res) => {
   res.setHeader('Content-Type', 'application/javascript');
   res.sendFile(path.join(__dirname, 'sw.js'));
 });
+app.get('/.well-known/assetlinks.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.json([
+    {
+      relation: ["delegate_permission/common.handle_all_urls"],
+      target: {
+        namespace: "android_app",
+        package_name: "app.railway.velodrop_production.twa",
+        sha256_cert_fingerprints: []
+      }
+    }
+  ]);
+});
 
 // Helper: Read & Write History
 function readHistory() {
