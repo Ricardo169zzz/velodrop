@@ -1,0 +1,18 @@
+{
+  "name": "VeloDrop - High-Velocity Media Downloader",
+  "short_name": "VeloDrop",
+  "description": "Unduh Video HD & Audio MP3 dari YouTube, TikTok, dan Instagram",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#08090C",
+  "theme_color": "#08090C",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

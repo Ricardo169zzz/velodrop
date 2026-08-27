@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>VeloDrop - Video & Audio Downloader</title>
   <link rel="icon" type="image/svg+xml" href="logo.svg">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#08090C">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -630,9 +635,23 @@
 
         </div>
 
-        <!-- Group 3: Sistem & Core Engine -->
+        <!-- Group 3: Aplikasi & Sistem -->
         <div class="setting-block">
-          <div class="block-label">SISTEM & CORE ENGINE</div>
+          <div class="block-label">APLIKASI & SISTEM</div>
+
+          <div class="setting-row" id="btn-pwa-install" style="cursor: pointer;">
+            <div class="row-left">
+              <div class="row-icon-box" style="background: rgba(220, 38, 38, 0.12); color: var(--accent-red-bright); border-color: rgba(220, 38, 38, 0.3);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+              </div>
+              <span class="row-title">Install VeloDrop ke HP / PC</span>
+            </div>
+            <span class="row-value-pill" style="color: var(--accent-red-bright); border-color: rgba(220, 38, 38, 0.3);">Pasang Aplikasi ›</span>
+          </div>
 
           <div class="setting-row" id="btn-reinstall-assets" style="cursor: pointer;">
             <div class="row-left">
@@ -655,7 +674,7 @@
               </div>
               <span class="row-title">GitHub Repository</span>
             </div>
-            <span class="row-value-pill">github.com ›</span>
+            <span class="row-value-pill">Ricardo169zzz/velodrop ›</span>
           </div>
 
         </div>

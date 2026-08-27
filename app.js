@@ -1079,7 +1079,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (btnOpenGithub) {
     btnOpenGithub.addEventListener('click', () => {
-      showToast('info', 'GitHub Repository', 'Membuka repository open source VeloDrop v1.0.0...');
+      window.open('https://github.com/Ricardo169zzz/velodrop', '_blank');
+    });
+  }
+
+  // ============================================================
+  // 11. PWA SERVICE WORKER & APP INSTALL PROMPT
+  // ============================================================
+  let deferredInstallPrompt = null;
+  const btnPwaInstall = document.getElementById('btn-pwa-install');
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch((err) => {
+        console.log('SW registration note:', err.message);
+      });
+    });
+  }
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    if (btnPwaInstall) {
+      btnPwaInstall.style.display = 'flex';
+    }
+  });
+
+  if (btnPwaInstall) {
+    btnPwaInstall.addEventListener('click', async () => {
+      if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        const { outcome } = await deferredInstallPrompt.userChoice;
+        if (outcome === 'accepted') {
+          showToast('success', 'Aplikasi Terpasang', 'VeloDrop berhasil ditambahkan ke layar utama perangkat.');
+        }
+        deferredInstallPrompt = null;
+      } else {
+        showToast('info', 'Install VeloDrop ke HP', 'Buka menu browser Anda (titik tiga di kanan atas) lalu pilih <strong>"Tambahkan ke Layar Utama" / "Install Aplikasi"</strong>.');
+      }
     });
   }
 
