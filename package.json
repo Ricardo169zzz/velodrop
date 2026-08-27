@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "build": "node -e \"const fs=require('fs'),path=require('path');['index.html','style.css','app.js','logo.svg','manifest.json','icon-192.png','icon-512.png'].forEach(f=>{if(fs.existsSync(f))fs.copyFileSync(f,path.join('www',f));});\" && cap sync android",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
