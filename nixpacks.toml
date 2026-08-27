@@ -1,11 +1,11 @@
-﻿[phases.setup]
-nixPkgs = ["nodejs_22", "python3", "ffmpeg"]
+[phases.setup]
+nixPkgs = ["nodejs_22", "python3", "ffmpeg", "yt-dlp"]
 
 [phases.install]
 cmds = ["npm ci || npm install"]
 
 [phases.build]
-cmds = ["node setup_bin.js || true"]
+cmds = ["node setup_bin.js"]
 
 [start]
 cmd = "npm start"

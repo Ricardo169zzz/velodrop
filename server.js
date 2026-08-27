@@ -25,12 +25,51 @@ const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
 const HISTORY_FILE = path.join(DOWNLOADS_DIR, 'history.json');
 const isWindows = process.platform === 'win32';
 const YTDLP_BIN_NAME = isWindows ? 'yt-dlp.exe' : 'yt-dlp';
-const YTDLP_PATH = path.join(BIN_DIR, YTDLP_BIN_NAME);
+
+function getYtDlpPath() {
+  const localBin = path.join(BIN_DIR, YTDLP_BIN_NAME);
+  if (fs.existsSync(localBin)) return localBin;
+
+  try {
+    const { execSync } = require('child_process');
+    const cmd = isWindows ? 'where yt-dlp' : 'which yt-dlp';
+    const out = execSync(cmd, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim().split('\n')[0].trim();
+    if (out && fs.existsSync(out)) return out;
+  } catch (e) {}
+
+  return localBin;
+}
+
+let YTDLP_PATH = getYtDlpPath();
 
 // Ensure required directories exist
 if (!fs.existsSync(BIN_DIR)) fs.mkdirSync(BIN_DIR, { recursive: true });
 if (!fs.existsSync(DOWNLOADS_DIR)) fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
 if (!fs.existsSync(HISTORY_FILE)) fs.writeFileSync(HISTORY_FILE, JSON.stringify([], null, 2));
+
+// Auto-ensure binary in background on startup
+async function autoEnsureBinary() {
+  YTDLP_PATH = getYtDlpPath();
+  if (fs.existsSync(YTDLP_PATH)) return;
+
+  console.log('[VeloDrop] Auto-downloading yt-dlp binary...');
+  const YTDLP_URL = isWindows
+    ? 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe'
+    : 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp';
+
+  try {
+    const target = path.join(BIN_DIR, YTDLP_BIN_NAME);
+    await downloadDirectStream(YTDLP_URL, target);
+    if (!isWindows && fs.existsSync(target)) {
+      try { fs.chmodSync(target, 0o755); } catch (e) {}
+    }
+    YTDLP_PATH = target;
+    console.log('[VeloDrop] yt-dlp binary is ready at:', target);
+  } catch (e) {
+    console.warn('[VeloDrop] Binary auto-download error:', e.message);
+  }
+}
+setTimeout(autoEnsureBinary, 1000);
 
 // Middleware
 app.use(cors());
@@ -814,7 +853,8 @@ app.post('/api/video/download', async (req, res) => {
             duration: duration || '00:30',
             badge: isAudio ? 'MP3 Audio' : (isTikTok ? 'TikTok HD' : 'Reels HD'),
             thumb: thumbnail || '',
-            filePath: `/media/${encodeURIComponent(targetFilename)}`
+            filePath: `/media/${encodeURIComponent(targetFilename)}`,
+            directUrl: streamTarget
           };
 
           const history = readHistory();
@@ -836,8 +876,15 @@ app.post('/api/video/download', async (req, res) => {
   }
 
   // --- YT-DLP Standard Fallback / YouTube / Instagram ---
+  YTDLP_PATH = getYtDlpPath();
   if (!fs.existsSync(YTDLP_PATH)) {
-    return res.status(503).json({ success: false, message: 'Engine binary belum siap.' });
+    try {
+      await autoEnsureBinary();
+    } catch (e) {}
+  }
+
+  if (!fs.existsSync(YTDLP_PATH)) {
+    return res.status(503).json({ success: false, message: 'Engine binary sedang disiapkan. Silakan coba 5 detik lagi.' });
   }
 
   const outputTemplate = path.join(DOWNLOADS_DIR, `%(title).60s-${fileId}.%(ext)s`);
@@ -910,7 +957,8 @@ app.post('/api/video/download', async (req, res) => {
         duration: duration || '03:00',
         badge: isAudio ? 'MP3 Audio' : 'MP4 HD',
         thumb: thumbnail || '',
-        filePath: `/media/${encodeURIComponent(finalBasename)}`
+        filePath: `/media/${encodeURIComponent(finalBasename)}`,
+        directUrl: url
       };
 
       const history = readHistory();

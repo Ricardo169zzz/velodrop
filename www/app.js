@@ -543,7 +543,8 @@ document.addEventListener('DOMContentLoaded', () => {
         duration: inspectedVideoData.duration || '03:00',
         badge: isAudio ? 'MP3 Audio' : 'MP4 HD',
         thumb: inspectedVideoData.thumbnail || '',
-        filePath: `/media/${encodeURIComponent(targetFilename)}`
+        filePath: `/media/${encodeURIComponent(targetFilename)}`,
+        directUrl: isAudio ? (inspectedVideoData.directAudioUrl || inspectedVideoData.directVideoUrl || inspectedVideoData.originalUrl) : (inspectedVideoData.directVideoUrl || inspectedVideoData.originalUrl)
       };
 
       // Add to local data immediately if not already present
