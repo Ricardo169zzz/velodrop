@@ -1,8 +1,10 @@
 {
+  "id": "https://velodrop-production.up.railway.app/",
   "name": "VeloDrop - High-Velocity Media Downloader",
   "short_name": "VeloDrop",
   "description": "Unduh Video HD & Audio MP3 dari YouTube, TikTok, dan Instagram",
-  "start_url": "/",
+  "start_url": "https://velodrop-production.up.railway.app/",
+  "scope": "https://velodrop-production.up.railway.app/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#08090C",

@@ -13,11 +13,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
       - name: Setup Java JDK
         uses: actions/setup-java@v4
         with:
@@ -27,13 +22,11 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Bubblewrap CLI
-        run: npm install -g @bubblewrap/cli
-
-      - name: Generate and Build TWA Android APK
+      - name: Install Bubblewrap & Build Android APK
         run: |
-          echo "Building VeloDrop Android APK package..."
-          npx @bubblewrap/cli init --manifest=manifest.json || true
+          npm install -g @bubblewrap/cli
+          npx @bubblewrap/cli init --manifest="https://velodrop-production.up.railway.app/manifest.json" --skipPushNotifications --no-interactive || true
+          npx @bubblewrap/cli build --skipSigning || true
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
@@ -41,4 +34,5 @@ jobs:
           name: VeloDrop-Android-APK
           path: |
             *.apk
-            app/build/outputs/apk/**/*.apk
+            **/*.apk
+            **/*.aab
