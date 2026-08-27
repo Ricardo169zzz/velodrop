@@ -889,10 +889,19 @@ app.post('/api/video/download', async (req, res) => {
     return res.status(503).json({ success: false, message: 'Engine binary sedang disiapkan. Silakan coba 5 detik lagi.' });
   }
 
+  let effectiveFfmpeg = '';
+  try {
+    const { execSync } = require('child_process');
+    const sysFfmpeg = execSync(isWindows ? 'where ffmpeg' : 'which ffmpeg', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim().split('\n')[0].trim();
+    if (sysFfmpeg && fs.existsSync(sysFfmpeg)) effectiveFfmpeg = sysFfmpeg;
+  } catch (e) {}
+  if (!effectiveFfmpeg && ffmpegPath && fs.existsSync(ffmpegPath)) {
+    effectiveFfmpeg = ffmpegPath;
+  }
+
   const outputTemplate = path.join(DOWNLOADS_DIR, `%(title).60s-${fileId}.%(ext)s`);
   const formatArg = isAudio ? 'bestaudio/best' : 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
   const args = [
-    '--js-runtimes', 'node',
     '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
     '-f', formatArg,
     '--no-part',
@@ -901,8 +910,8 @@ app.post('/api/video/download', async (req, res) => {
     '-o', outputTemplate
   ];
 
-  if (ffmpegPath && fs.existsSync(ffmpegPath)) {
-    args.push('--ffmpeg-location', ffmpegPath);
+  if (effectiveFfmpeg) {
+    args.push('--ffmpeg-location', effectiveFfmpeg);
   }
   if (isAudio) {
     args.push('--extract-audio', '--audio-format', 'mp3');
@@ -911,16 +920,23 @@ app.post('/api/video/download', async (req, res) => {
 
   const proc = spawn(YTDLP_PATH, args, { windowsHide: true });
   let savedFilePath = '';
+  let stdoutData = '';
+  let stderrData = '';
 
   proc.stdout.on('data', (data) => {
-    const text = data.toString();
-    const destMatch = text.match(/Destination:\s*(.+)/);
+    stdoutData += data.toString();
+    const destMatch = data.toString().match(/Destination:\s*(.+)/);
     if (destMatch && destMatch[1]) {
       savedFilePath = destMatch[1].trim();
     }
   });
 
+  proc.stderr.on('data', (data) => {
+    stderrData += data.toString();
+  });
+
   proc.on('close', (code) => {
+    console.log(`[VeloDrop] YT-DLP process exited with code ${code}. Stderr: ${stderrData.slice(0, 200)}`);
     let finalFile = '';
     const files = fs.readdirSync(DOWNLOADS_DIR);
     const matchingFiles = files.filter(f => f.includes(fileId) && !f.endsWith('.part') && !f.endsWith('.ytdl'));
@@ -928,7 +944,7 @@ app.post('/api/video/download', async (req, res) => {
     if (matchingFiles.length > 0) {
       let chosenName = '';
       if (isAudio) {
-        chosenName = matchingFiles.find(f => f.endsWith('.mp3')) || matchingFiles.find(f => f.endsWith('.m4a')) || matchingFiles.find(f => f.endsWith('.webm')) || matchingFiles[0];
+        chosenName = matchingFiles.find(f => f.endsWith('.mp3')) || matchingFiles.find(f => f.endsWith('.m4a')) || matchingFiles.find(f => f.endsWith('.webm')) || matchingFiles.find(f => f.endsWith('.opus')) || matchingFiles[0];
       } else {
         chosenName = matchingFiles.find(f => f.endsWith('.mp4')) || matchingFiles.find(f => f.endsWith('.mkv')) || matchingFiles.find(f => f.endsWith('.webm')) || matchingFiles[0];
       }
