@@ -803,13 +803,24 @@ app.post('/api/video/download', async (req, res) => {
   });
 
   proc.on('close', (code) => {
-    let finalFile = savedFilePath;
-    if (!finalFile || !fs.existsSync(finalFile)) {
-      const files = fs.readdirSync(DOWNLOADS_DIR);
-      const matched = files.find(f => f.includes(fileId));
-      if (matched) {
-        finalFile = path.join(DOWNLOADS_DIR, matched);
+    let finalFile = '';
+    const files = fs.readdirSync(DOWNLOADS_DIR);
+    const matchingFiles = files.filter(f => f.includes(fileId) && !f.endsWith('.part') && !f.endsWith('.ytdl'));
+
+    if (matchingFiles.length > 0) {
+      let chosenName = '';
+      if (isAudio) {
+        chosenName = matchingFiles.find(f => f.endsWith('.mp3')) || matchingFiles.find(f => f.endsWith('.m4a')) || matchingFiles.find(f => f.endsWith('.webm')) || matchingFiles[0];
+      } else {
+        chosenName = matchingFiles.find(f => f.endsWith('.mp4')) || matchingFiles.find(f => f.endsWith('.mkv')) || matchingFiles.find(f => f.endsWith('.webm')) || matchingFiles[0];
       }
+      if (chosenName) {
+        finalFile = path.join(DOWNLOADS_DIR, chosenName);
+      }
+    }
+
+    if (!finalFile && savedFilePath && fs.existsSync(savedFilePath)) {
+      finalFile = savedFilePath;
     }
 
     if (finalFile && fs.existsSync(finalFile)) {
@@ -825,8 +836,8 @@ app.post('/api/video/download', async (req, res) => {
         type: isAudio ? 'audio' : 'video',
         filename: title || finalBasename,
         savedFile: finalBasename,
-        source: uploader || 'VeloDrop Engine',
-        sizeMb: parseFloat(actualSizeMb) || 12.0,
+        source: uploader || 'YouTube Creator',
+        sizeMb: parseFloat(actualSizeMb) || (isAudio ? 3.5 : 12.0),
         duration: duration || '03:00',
         badge: isAudio ? 'MP3 Audio' : 'MP4 HD',
         thumb: thumbnail || '',
@@ -837,7 +848,7 @@ app.post('/api/video/download', async (req, res) => {
       const filtered = history.filter(h => h.id !== fileId);
       filtered.unshift(historyItem);
       writeHistory(filtered);
-      console.log(`[VeloDrop] YT-DLP download completed and saved: ${finalBasename}`);
+      console.log(`[VeloDrop] Download saved to history: ${finalBasename} (${actualSizeMb} MB)`);
     }
   });
 

@@ -498,8 +498,9 @@ document.addEventListener('DOMContentLoaded', () => {
       switchScreen('downloads');
 
       // Trigger Backend Download
+      let downloadedFileId = null;
       try {
-        await fetch(`${API_BASE}/api/video/download`, {
+        const dlResponse = await fetch(`${API_BASE}/api/video/download`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -513,8 +514,42 @@ document.addEventListener('DOMContentLoaded', () => {
             directAudioUrl: inspectedVideoData.directAudioUrl
           })
         });
+        const dlJson = await dlResponse.json();
+        if (dlJson.success && dlJson.fileId) {
+          downloadedFileId = dlJson.fileId;
+        }
       } catch (err) {
         console.error('Backend download error:', err);
+      }
+
+      // Optimistic Instant Local Update
+      const optimisticId = downloadedFileId || `${Date.now()}`;
+      const ext = isAudio ? 'mp3' : 'mp4';
+      const cleanTitle = (inspectedVideoData.title || 'Media').replace(/[/\\?%*:|"<>]/g, '').slice(0, 50);
+      const targetFilename = `${cleanTitle}-${optimisticId}.${ext}`;
+      const selectedFmt = inspectedVideoData.formats ? inspectedVideoData.formats.find(f => f.type === selectedFormatType) : null;
+      const rawFmtSize = selectedFmt ? parseFloat(selectedFmt.sizeMb) : (isAudio ? 3.5 : 12.0);
+      const fileMb = !isNaN(rawFmtSize) && rawFmtSize > 0 ? rawFmtSize : (isAudio ? 3.5 : 12.0);
+
+      const optimisticItem = {
+        id: optimisticId,
+        timestamp: Date.now(),
+        createdAt: new Date().toISOString(),
+        type: isAudio ? 'audio' : 'video',
+        filename: videoTitle,
+        savedFile: targetFilename,
+        source: inspectedVideoData.uploader || 'VeloDrop',
+        sizeMb: fileMb,
+        duration: inspectedVideoData.duration || '03:00',
+        badge: isAudio ? 'MP3 Audio' : 'MP4 HD',
+        thumb: inspectedVideoData.thumbnail || '',
+        filePath: `/media/${encodeURIComponent(targetFilename)}`
+      };
+
+      // Add to local data immediately if not already present
+      if (!downloadsData.some(d => d.id === optimisticId || d.filename === videoTitle)) {
+        downloadsData.unshift(optimisticItem);
+        renderDownloadsList();
       }
 
       // Active Task Progress Simulation on Client while backend writes file
@@ -531,12 +566,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let pct = 0;
         if (taskBar) taskBar.style.width = '0%';
-        const selectedFmt = inspectedVideoData.formats ? inspectedVideoData.formats.find(f => f.type === selectedFormatType) : null;
-        const rawFmtSize = selectedFmt ? parseFloat(selectedFmt.sizeMb) : (isAudio ? 1.5 : 4.8);
-        const fileMb = !isNaN(rawFmtSize) && rawFmtSize > 0 ? rawFmtSize : (isAudio ? 1.5 : 4.8);
 
         const dlInterval = setInterval(async () => {
-          pct += 6;
+          pct += 8;
           if (pct > 95) pct = 95;
 
           if (taskBar) taskBar.style.width = `${pct}%`;
@@ -545,7 +577,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
           // Periodically check if backend has completed and written file
           const checkRes = await fetch(`${API_BASE}/api/downloads`).then(r => r.json()).catch(() => ({ downloads: [] }));
-          const isFinished = checkRes.downloads && checkRes.downloads.some(d => d.filename === videoTitle || d.title === videoTitle);
+          const isFinished = checkRes.downloads && checkRes.downloads.some(d => d.id === downloadedFileId || d.filename === videoTitle || d.title === videoTitle);
 
           if (isFinished || pct >= 95) {
             clearInterval(dlInterval);
@@ -558,11 +590,11 @@ document.addEventListener('DOMContentLoaded', () => {
               showToast(
                 'success',
                 'Unduhan Selesai',
-                `File <strong>${videoTitle.slice(0, 35)}...</strong> berhasil tersimpan.`
+                `File <strong>${videoTitle.slice(0, 35)}...</strong> berhasil tersimpan di folder downloads.`
               );
             }, 500);
           }
-        }, 800);
+        }, 600);
       }
     });
   }
@@ -1189,5 +1221,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Inisialisasi izin notifikasi saat awal masuk
   initNotificationSystem();
+
+  // Inisialisasi riwayat unduhan awal
+  fetchBackendDownloads();
 
 });
