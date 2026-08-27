@@ -33,6 +33,24 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 app.use('/media', express.static(DOWNLOADS_DIR));
 
+// PWA Static Asset Routes
+app.get('/manifest.json', (req, res) => {
+  res.sendFile(path.join(__dirname, 'manifest.json'));
+});
+app.get('/icon-192.png', (req, res) => {
+  res.sendFile(path.join(__dirname, 'icon-192.png'));
+});
+app.get('/icon-512.png', (req, res) => {
+  res.sendFile(path.join(__dirname, 'icon-512.png'));
+});
+app.get('/logo.svg', (req, res) => {
+  res.sendFile(path.join(__dirname, 'logo.svg'));
+});
+app.get('/sw.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.sendFile(path.join(__dirname, 'sw.js'));
+});
+
 // Helper: Read & Write History
 function readHistory() {
   try {
