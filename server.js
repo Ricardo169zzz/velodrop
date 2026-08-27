@@ -272,10 +272,12 @@ async function downloadDirectStream(streamUrl, targetFilePath, onProgress) {
 // ============================================================
 
 app.get('/api/engine/status', (req, res) => {
+  YTDLP_PATH = getYtDlpPath();
   const isInstalled = fs.existsSync(YTDLP_PATH);
   res.json({
     installed: isInstalled,
-    status: isInstalled ? 'READY' : 'NEEDS_SETUP'
+    status: isInstalled ? 'READY' : 'NEEDS_SETUP',
+    path: YTDLP_PATH
   });
 });
 
