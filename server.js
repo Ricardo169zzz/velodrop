@@ -71,6 +71,9 @@ async function autoEnsureBinary() {
 }
 setTimeout(autoEnsureBinary, 1000);
 
+// ponytail: diagnostic capture for yt-dlp failures
+let lastYtDlpResult = { code: null, stdout: '', stderr: '', args: [], timestamp: null };
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -960,7 +963,8 @@ app.post('/api/video/download', async (req, res) => {
   });
 
   proc.on('close', (code) => {
-    console.log(`[VeloDrop] YT-DLP process exited with code ${code}. Stderr: ${stderrData.slice(0, 200)}`);
+    lastYtDlpResult = { code, stdout: stdoutData.slice(0, 500), stderr: stderrData.slice(0, 500), args: args.filter(a => !a.includes('Mozilla')), timestamp: new Date().toISOString() };
+    console.log(`[VeloDrop] YT-DLP process exited with code ${code}. Stderr: ${stderrData.slice(0, 500)}`);
     let finalFile = '';
     const files = fs.readdirSync(DOWNLOADS_DIR);
     const matchingFiles = files.filter(f => f.includes(fileId) && !f.endsWith('.part') && !f.endsWith('.ytdl'));
@@ -1068,6 +1072,18 @@ app.delete('/api/downloads', (req, res) => {
 
   writeHistory([]);
   res.json({ success: true, message: 'Semua file dan riwayat unduhan berhasil dibersihkan.' });
+});
+
+// Diagnostic endpoint for debugging yt-dlp failures
+app.get('/api/debug/ytdlp', (req, res) => {
+  const files = fs.readdirSync(DOWNLOADS_DIR).filter(f => f !== 'history.json');
+  res.json({
+    lastResult: lastYtDlpResult,
+    downloadsDir: DOWNLOADS_DIR,
+    filesOnDisk: files,
+    ytdlpPath: YTDLP_PATH,
+    ytdlpExists: fs.existsSync(YTDLP_PATH)
+  });
 });
 
 // Start Server
