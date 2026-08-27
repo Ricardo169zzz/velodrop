@@ -1,9 +1,10 @@
 {
-  "name": "aplikasi-chat",
+  "name": "velodrop",
   "version": "1.0.0",
-  "description": "",
-  "main": "app.js",
+  "description": "VeloDrop High-Velocity Media Downloader",
+  "main": "server.js",
   "scripts": {
+    "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
