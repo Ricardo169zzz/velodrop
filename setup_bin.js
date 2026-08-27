@@ -11,8 +11,8 @@ if (!fs.existsSync(binDir)) {
   fs.mkdirSync(binDir, { recursive: true });
 }
 
-if (fs.existsSync(targetPath)) {
-  console.log('[Setup] Binary already present at:', targetPath);
+if (fs.existsSync(targetPath) && fs.statSync(targetPath).size > 1000000) {
+  console.log('[Setup] Binary already present and valid at:', targetPath);
   process.exit(0);
 }
 
@@ -22,31 +22,41 @@ const url = isWindows
 
 console.log('[Setup] Downloading yt-dlp binary from:', url);
 
-function download(downloadUrl, dest) {
-  https.get(downloadUrl, (res) => {
-    if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307) {
-      return download(res.headers.location, dest);
-    }
-    if (res.statusCode !== 200) {
-      console.error('[Setup] Failed to download binary:', res.statusCode);
-      return;
-    }
+function downloadStream(downloadUrl, dest) {
+  return new Promise((resolve, reject) => {
+    https.get(downloadUrl, (res) => {
+      if (res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307) {
+        return downloadStream(res.headers.location, dest).then(resolve).catch(reject);
+      }
+      if (res.statusCode !== 200) {
+        return reject(new Error('Failed with status: ' + res.statusCode));
+      }
 
-    const file = fs.createWriteStream(dest);
-    res.pipe(file);
-    file.on('finish', () => {
-      file.close(() => {
-        if (!isWindows) {
-          try {
-            fs.chmodSync(dest, 0o755);
-          } catch (e) {}
-        }
-        console.log('[Setup] Binary downloaded and ready at:', dest);
+      const file = fs.createWriteStream(dest);
+      res.pipe(file);
+      file.on('finish', () => {
+        file.close(() => {
+          if (!isWindows) {
+            try {
+              fs.chmodSync(dest, 0o755);
+            } catch (e) {}
+          }
+          console.log('[Setup] Binary downloaded and verified at:', dest);
+          resolve();
+        });
       });
-    });
-  }).on('error', (err) => {
-    console.error('[Setup] Network error during binary download:', err.message);
+      file.on('error', reject);
+    }).on('error', reject);
   });
 }
 
-download(url, targetPath);
+(async () => {
+  try {
+    await downloadStream(url, targetPath);
+    console.log('[Setup] Completed successfully.');
+    process.exit(0);
+  } catch (err) {
+    console.error('[Setup] Error:', err.message);
+    process.exit(1);
+  }
+})();
