@@ -27,15 +27,15 @@ const isWindows = process.platform === 'win32';
 const YTDLP_BIN_NAME = isWindows ? 'yt-dlp.exe' : 'yt-dlp';
 
 function getYtDlpPath() {
-  const localBin = path.join(BIN_DIR, YTDLP_BIN_NAME);
-  if (fs.existsSync(localBin)) return localBin;
-
   try {
     const { execSync } = require('child_process');
     const cmd = isWindows ? 'where yt-dlp' : 'which yt-dlp';
     const out = execSync(cmd, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim().split('\n')[0].trim();
     if (out && fs.existsSync(out)) return out;
   } catch (e) {}
+
+  const localBin = path.join(BIN_DIR, YTDLP_BIN_NAME);
+  if (fs.existsSync(localBin)) return localBin;
 
   return localBin;
 }
@@ -945,7 +945,17 @@ app.post('/api/video/download', async (req, res) => {
   }
   args.push(url);
 
-  const proc = spawn(YTDLP_PATH, args, { windowsHide: true });
+  let execCmd = YTDLP_PATH;
+  let execArgs = args;
+
+  if (!isWindows && fs.existsSync(YTDLP_PATH) && !YTDLP_PATH.endsWith('.exe')) {
+    if (!YTDLP_PATH.startsWith('/nix') && !YTDLP_PATH.startsWith('/usr')) {
+      execCmd = 'python3';
+      execArgs = [YTDLP_PATH, ...args];
+    }
+  }
+
+  const proc = spawn(execCmd, execArgs, { windowsHide: true });
   let savedFilePath = '';
   let stdoutData = '';
   let stderrData = '';
